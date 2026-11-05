@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Reference Governance</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <img class="header-logo" src="./logo-color.svg" alt="" width="22" height="22">
+            <span class="header-title">Connection Reference Governance</span>
+            <span class="header-version" id="app-version"></span>
+        </div>
+        <div class="header-right" id="header-right"></div>
+    </header>
+
+    <main class="main-content" id="main-content">
+        <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb" hidden></nav>
+        <div id="content"></div>
+        <section class="panel log-panel" aria-label="Log">
+            <div id="log" class="log"></div>
+        </section>
+    </main>
+    <script type="module" src="./app.ts"></script>
+</body>
+</html>
