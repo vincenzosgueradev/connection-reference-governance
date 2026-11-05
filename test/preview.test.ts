@@ -25,7 +25,7 @@ async function toPreview(kind: 'repoint' | 'connection' = 'repoint') {
     return a;
 }
 const cards = (root: ParentNode) => qa(root, '.item-card');
-const strip = (root: ParentNode) => Object.fromEntries(qa(root, '.strip .stat').map(s => [q(s, 'dt')!.textContent, q(s, 'dd')!.textContent]));
+const strip = (root: ParentNode) => q(root, '.preview-summary')!.textContent;
 
 describe('the Preview step: what is shown', () => {
     it('has the title, the stepper on Preview and one card per item with its name, id and number of changes', async () => {
@@ -38,7 +38,8 @@ describe('the Preview step: what is shown', () => {
         expect(q(cards(root)[0]!, '.item-count')!.textContent).toBe('1 change');
     });
     it('a strip counts the items and the changes', async () => {
-        expect(strip((await toPreview()).root)).toEqual({ Items: '2', Changes: '2', 'Not changed': '0' });
+        expect(strip((await toPreview()).root)).toBe('2 items · 2 changes');
+        expect(q((await toPreview()).root, '.hero')).toBeNull();
     });
 });
 
@@ -97,19 +98,21 @@ describe('layout, mode and collapsing', () => {
         expect(qa(q(cards(root)[0]!, '.diff')!, '.diff-code--old')).toHaveLength(1);
         expect(qa(q(cards(root)[0]!, '.diff')!, '.diff-code--new')).toHaveLength(1);
     });
-    it('the Table mode lists WHAT, BEFORE, AFTER and STATE for each changed field', async () => {
+    it('the Table tab lists each item with what it is now and what it will be; the Code diff tab is the default', async () => {
         const { root } = await toPreview();
-        const card = () => cards(root)[0]!;
-        qa(card(), '.item-head .segment').find(b => b.textContent === 'Table')!.click();
-        expect(q(card(), '.diff')).toBeNull();
-        expect(qa(card(), 'th').map(t => t.textContent)).toEqual(['What', 'Before', 'After', 'State']);
-        const cells = qa(card(), 'tbody tr td').map(c => c.textContent);
-        expect(q(card(), '.what-title')!.textContent).toBe('Connection reference shared_k0');
-        expect(q(card(), '.what-path')!.textContent).toBe('properties.connectionReferences.shared_k0.connection.connectionReferenceLogicalName');
-        expect(cells.slice(1)).toEqual(['sample_ref1', 'sample_ref2', 'Changed']);
-        expect(q(card(), '.chip--success')!.textContent).toBe('Changed');
-        // the other item keeps its own mode
-        expect(q(cards(root)[1]!, '.diff')).not.toBeNull();
+        expect(qa(root, '.preview-tabs > .segmented:first-child .segment').map(b => b.textContent)).toEqual(['Code diff', 'Table']);
+        expect(qa(root, '.preview-tabs > .segmented:first-child .is-active').map(b => b.textContent)).toEqual(['Code diff']);
+        expect(cards(root)).toHaveLength(2);
+        qa(root, '.preview-tabs > .segmented:first-child .segment').find(b => b.textContent === 'Table')!.click();
+        expect(cards(root)).toHaveLength(0);
+        expect(q(root, '.diff')).toBeNull();
+        expect(q(root, '.layout-bar')).toBeNull();
+        const rows = qa(root, '.change-row');
+        expect(rows).toHaveLength(2);
+        expect(q(rows[0]!, '.change-name strong')!.textContent).toBe('Alpha flow');
+        expect(q(rows[0]!, '.change-old')!.textContent).toContain('Ref 1');
+        qa(root, '.preview-tabs > .segmented:first-child .segment').find(b => b.textContent === 'Code diff')!.click();
+        expect(cards(root)).toHaveLength(2);
     });
     it('the chevron collapses an item and expands it again', async () => {
         const { root, store } = await toPreview();
@@ -148,7 +151,7 @@ describe('items that are not written', () => {
         expect(q(blocked, '.callout--warning')!.textContent).toContain('turn it off first');
         expect(q(blocked, '.diff')).toBeNull();
         expect(q(blocked, '.item-head .segmented')).toBeNull();
-        expect(strip(a.root)).toEqual({ Items: '1of 2', Changes: '1', 'Not changed': '1' });
+        expect(strip(a.root)).toBe('1 of 2 items · 1 change · 1 not changed');
     });
 });
 
@@ -161,7 +164,7 @@ describe('many items and big definitions', () => {
         const root = document.createElement('div');
         document.body.innerHTML = '';
         document.body.append(root);
-        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
+        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, previewRemove: () => undefined, previewDelete: () => undefined, setTypedCode: () => undefined, setManageState: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
         mountMain(root, store, h, () => 'Env');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
@@ -215,9 +218,9 @@ describe('Apply... and Back', () => {
         expect(qa(a.crumbs, '.crumb').map(c => c.textContent)).toEqual(['Solutions', 'Sample', 'Preview']);
         expect(qa(a.crumbs, '.crumb--link').map(c => c.textContent)).toEqual(['Solutions', 'Sample']);
     });
-    it('Apply... is disabled when no row can be written', async () => {
+    it('Apply... is disabled when no row can be written, and the permission cannot change it', async () => {
         const a = await app();
-        a.flows.forEach(f => { f.stateCode = 1; });
+        a.flows.forEach(f => { f.stateCode = 2; }); // suspended: not something the tool turns off
         a.controller.selectSolution(a.sol.id);
         await settle();
         a.store.dispatch({ type: 'selectAll', ids: [guid(10)] });

@@ -28,7 +28,6 @@ async function run(opts: Parameters<typeof app>[0] = {}, kind: 'repoint' | 'conn
     return a;
 }
 const figs = (root: ParentNode) => Object.fromEntries(qa(root, '.fig').map(f => [q(f, '.fig-label')!.textContent, q(f, '.fig-value')!.textContent]));
-const facts = (root: ParentNode) => Object.fromEntries(qa(root, '.strip .stat').map(s => [q(s, 'dt')!.textContent, q(s, 'dd')!.textContent]));
 const resultRows = (root: ParentNode) => qa(qa(root, '.detail-block').find(b => q(b, '.detail-title')!.textContent === 'Rows')!, 'tbody tr').map(r => qa(r, 'td').map(c => c.textContent));
 
 describe('the Result step after a clean run', () => {
@@ -36,7 +35,7 @@ describe('the Result step after a clean run', () => {
         const a = await run();
         expect(q(a.root, '.step-title')!.textContent).toBe('Result');
         expect(qa(a.root, '.stepper-item').map(i => i.className.replace('stepper-item ', ''))).toEqual(['is-done', 'is-done', 'is-done', 'is-active']);
-        expect(qa(a.crumbs, '.crumb').map(c => c.textContent)).toEqual(['Solutions', 'Sample', 'Preview', 'Apply', 'Result']);
+        expect(qa(a.crumbs, '.crumb').map(c => c.textContent)).toEqual(['Solutions', 'Sample', 'Result']);
         expect(qa(a.crumbs, '.crumb--link').map(c => c.textContent)).toEqual(['Solutions', 'Sample']);
     });
     it('says in a green banner that everything was written and read back', async () => {
@@ -50,7 +49,7 @@ describe('the Result step after a clean run', () => {
         expect(qa(a.root, '.fig--success')).toHaveLength(3);
     });
     it('shows the operation, the solution and the environment', async () => {
-        expect(facts((await run()).root)).toEqual({ Operation: 'Re-point flows', Solution: 'Sample', Environment: 'Test (Dev)' });
+        expect(q((await run()).root, '.hero')).toBeNull(); // no banner that repeats the operation
     });
     it('lists every row with its outcome and the message that it was read back', async () => {
         const a = await run();
@@ -112,7 +111,7 @@ describe('the Result step after a run with problems', () => {
 describe('a change of connection ends the same way', () => {
     it('names the operation and writes the connection ids, read back', async () => {
         const a = await run({}, 'connection', 65_000);
-        expect(facts(a.root)['Operation']).toBe('Change connection');
+        expect(q(a.root, '.hero')).toBeNull();
         expect(figs(a.root)).toEqual({ Changed: '2', Skipped: '0', Failed: '0', Duration: '1 min 05 s' });
         expect(a.refs.slice(0, 2).map(r => r.connectionId)).toEqual(['conn-9', 'conn-9']);
     });

@@ -13,7 +13,10 @@ export function stepFrame(step: WizardStep, body: readonly Node[], footer: reado
     head.append(title, stepper(STEPS, stepIndex(step)));
     const foot = el('div', 'step-footer');
     foot.append(...footer);
-    root.append(head, ...body, foot);
+    // the head stays, the body scrolls, the buttons stay at the bottom of the page
+    const scroll = el('div', 'step-body');
+    scroll.append(...body);
+    root.append(head, scroll, foot);
     return root;
 }
 

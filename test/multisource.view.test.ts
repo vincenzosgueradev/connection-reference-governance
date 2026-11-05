@@ -73,9 +73,10 @@ describe('two categories in one run (feature 013)', () => {
         const a = await app({ flows: three(), references: [...defaultReferences(), ref(5, { connectorId: '/providers/Microsoft.PowerApps/apis/shared_b' })] });
         a.store.dispatch({ type: 'selectAll', ids: [guid(10), guid(11), guid(12)] });
         studio(a);
-        buttonByText(a.root, 'Select every category')!.click();
+        buttonByText(a.root, 'Select all')!.click();
         (qa(a.root, '.choice').find(c => c.getAttribute('aria-label') === 'Use Ref 3') as HTMLElement).click();
-        buttonByText(a.root, 'Next')!.click();
+        (qa(a.root, '.studio-pipe-item')[1] as HTMLElement).click();
+        buttonByText(a.root, 'Select all')!.click();
         (qa(a.root, '.choice').find(c => c.getAttribute('aria-label') === 'Use Ref 5') as HTMLElement).click();
         buttonByText(a.root, 'Review changes')!.click();
         await settle();

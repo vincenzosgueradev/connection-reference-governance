@@ -1,8 +1,8 @@
 import { connectorInfo } from '../model/connectors';
 import { TYPE_LABEL } from '../model/flowinfo';
-import { affectedFlowTotal, turnOffRows, writableRows } from '../model/plans';
+import { affectedFlowTotal, TURNED_ON, turnOffRows, writableRows } from '../model/plans';
 import type { Plan, Snapshot } from '../types';
-import { button, callout, changeList, chip, connectionBadge, el, figures, icon, modal, sectionTitle, toggle, type ChangeRow } from '../ui/components';
+import { button, callout, chip, connectionBadge, el, figures, icon, modal, toggle, type ChangeRow } from '../ui/components';
 import { connectionChip, connectorTile } from './connections';
 import { makeExpandable } from './expand';
 
@@ -19,6 +19,7 @@ export interface ConfirmHandlers {
     setAck(on: boolean): void;
     setExpanded(on: boolean): void;
     setStateAck(on: boolean): void;
+    setManageState(on: boolean): void;
 }
 
 export interface ConfirmArgs {
@@ -29,6 +30,7 @@ export interface ConfirmArgs {
     backupSaved: boolean;
     expanded: boolean;
     stateAck: boolean;
+    manageState: boolean;
 }
 
 /** A reference named by its glyph, its name and its connector: what a flow points to before or after. */
@@ -54,6 +56,11 @@ export function referencesList(snapshot: Snapshot, joined: string, tone: 'old' |
 export function rowsOf(plan: Plan, snapshot: Snapshot): ChangeRow[] {
     return plan.rows.map(r => {
         const blocked = r.blocked;
+        if (plan.kind === 'remove' || plan.kind === 'delete') {
+            const isFlow = snapshot.flows.some(f => f.flow.id === r.id);
+            const gone = el('span', plan.kind === 'delete' ? 'removal-to removal-to--delete' : 'removal-to', r.newValue);
+            return { name: r.label, sub: isFlow ? 'Flow' : 'Connection reference', from: el('span', 'removal-from', r.oldValue), to: gone, ...(blocked !== undefined ? { blocked } : {}) };
+        }
         if (plan.kind === 'connection') {
             const logical = snapshot.references.find(x => x.reference.id === r.id)?.reference.logicalName;
             return { name: r.label, sub: logical, from: connectionChip(r.oldValue), to: connectionChip(r.newValue), ...(blocked !== undefined ? { blocked } : {}) };
@@ -87,13 +94,16 @@ export function writtenCallout(plan: Plan): HTMLElement {
 }
 
 /** The offer to save the old values, and the proof that it was saved. */
-export function backupCallout(saved: boolean, onSave: () => void): HTMLElement {
+export function backupCallout(saved: boolean, onSave: () => void, kind: Plan['kind'] = 'connection'): HTMLElement {
+    const deleting = kind === 'delete';
     const save = button(saved ? 'Save again' : 'Save backup', 'secondary', onSave, true);
     save.prepend(icon('save'));
     return callout(
         saved ? 'success' : 'primary',
-        saved ? 'Backup saved' : 'Save a backup first (recommended)',
-        ['The old values of every row that will change are written to a file you choose, so you can restore them by hand. Undo is not offered for writes to the environment.'],
+        saved ? 'Backup saved' : deleting ? 'Save a copy first (strongly recommended)' : 'Save a backup first (recommended)',
+        [deleting
+            ? 'The definition of every flow and the record of every reference that will be deleted are written to a file you choose. Deleting cannot be undone: this file is the only copy.'
+            : 'The old values of every row that will change are written to a file you choose, so you can restore them by hand. Undo is not offered for writes to the environment.'],
         saved ? 'check-circle' : 'save',
         save,
     );
@@ -110,6 +120,23 @@ export function stateCallout(names: readonly string[]): HTMLElement {
     ], 'power');
     c.classList.add('state-callout');
     return c;
+}
+
+/**
+ * The permission to turn flows that are on off for the change and on again afterwards (feature 011), asked here, where
+ * the write is decided, and only when a flow of the plan is on. Off by default.
+ */
+export function permissionBlock(plan: Plan, allowed: boolean, onChange: (on: boolean) => void): HTMLElement | null {
+    const on = plan.rows.filter(r => r.blocked === TURNED_ON || r.turnOff === true).length;
+    if (plan.kind !== 'repoint' || on === 0) return null;
+    const root = el('section', allowed ? 'studio-state is-on' : 'studio-state');
+    const text = el('div', 'studio-state-text');
+    text.append(
+        el('strong', 'studio-state-title', 'Turn these flows off for the change and on again afterwards'),
+        el('span', 'studio-state-hint', `${on} flow${on === 1 ? ' is' : 's are'} turned on: without this ${on === 1 ? 'it stays' : 'they stay'} blocked and is not written.`),
+    );
+    root.append(icon('power', 'studio-state-icon'), text, toggle(allowed, 'Turn the flows that are on off and on again', () => onChange(!allowed)));
+    return root;
 }
 
 export function confirmModal(a: ConfirmArgs, h: ConfirmHandlers): HTMLElement {
@@ -133,15 +160,13 @@ export function confirmModal(a: ConfirmArgs, h: ConfirmHandlers): HTMLElement {
         ]),
     ];
 
-    const list = el('div');
-    list.append(sectionTitle('What will change', 'list'), changeList(rowsOf(plan, a.snapshot)));
-    body.push(list);
-
+    const permission = permissionBlock(plan, a.manageState, h.setManageState);
+    if (permission) body.push(permission);
     const warnings = warningsCallout(plan);
     if (warnings) body.push(warnings);
     const off = turnOffRows(plan);
     if (off.length > 0) body.push(stateCallout(off.map(r => r.label)));
-    body.push(writtenCallout(plan), backupCallout(a.backupSaved, h.saveBackup));
+    body.push(writtenCallout(plan), backupCallout(a.backupSaved, h.saveBackup, plan.kind));
 
     const foot = el('div', 'ack');
     const label = `I reviewed these changes and understand they are written to ${env}.`;

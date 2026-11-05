@@ -81,3 +81,7 @@ Every requirement above is covered by tests; mutation checks guard the rules tha
 - test/planDiff.test.ts
 - test/preview.test.ts
 - test/ui.kit.test.ts (diff)
+
+## Amendment 2026-11-05 (hand look: one kind of header)
+
+The grey strip of figures at the top of the Preview and the strip of facts at the top of the Result are replaced by the same banner as the home screen (title, one line, stat tiles with icons): the Preview names the operation and the solution and shows Items, Changes and Not changed; the Result names the operation, the solution and the environment and shows the number of rows. Wherever a screen has a header of this kind it uses this banner.

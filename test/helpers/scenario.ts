@@ -87,6 +87,9 @@ export function scenario(opts: ScenarioOptions = {}) {
             if (f && 'clientdata' in record) f.clientData = String(record['clientdata']);
             if (f && 'statecode' in record && !opts.ignoreState) f.stateCode = Number(record['statecode']);
         },
+        async remove() {},
+        async dependencies() { return []; },
+        async removeFromSolution() {},
         async currentUserId() {
             return '11111111-1111-4111-8111-111111111111';
         },

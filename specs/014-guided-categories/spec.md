@@ -76,3 +76,9 @@ Every requirement above is covered by tests; mutation checks guard the rules tha
 - test/categories.test.ts
 - test/studio.test.ts "pipeline"
 - test/reducer.test.ts "studio step"
+
+## Amendment 2026-11-05 (hand look: repeated actions)
+
+Back and Next repeated what a click on the pipeline already does, so they are removed. The steps are reached by clicking the pipeline; the bottom bar holds where you are (Category n of m, or Summary), the note of what is missing in the current category, Cancel and Review changes. An incomplete category no longer blocks moving: it is marked incomplete in the pipeline, and Review changes stays closed until every ticked category has its new reference. FR-1403 and scenarios 3, 4 and 7 are read accordingly; the studio keeps the figures fixed at the bottom and scrolls only the two lists.
+
+Also removed (same day): the "Select every category" and "Clear all" buttons over the pipeline. In every category the right side always asks for the new reference, so a global tick-everything shortcut saved nothing; each category keeps its own Select all and Clear.

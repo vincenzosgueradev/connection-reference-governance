@@ -1,8 +1,7 @@
 import { attentionFirst, banner, formatElapsed, summarize } from '../model/progress';
-import { operationLabel } from '../model/workflow';
 import type { Wizard } from '../state/reducer';
 import type { RowOutcome } from '../types';
-import { callout, dataTable, detailBlock, el, factStrip, figures, tableWrap } from '../ui/components';
+import { callout, dataTable, detailBlock, el, figures, tableWrap } from '../ui/components';
 import { outcomeChip } from './outcome';
 import { spacer, stepButton, stepFrame } from './workflow';
 
@@ -33,11 +32,6 @@ export function resultStep(a: ResultArgs, h: ResultHandlers): HTMLElement {
         { label: 'Duration', value: formatElapsed(duration), icon: 'clock', tone: 'info' },
     ]);
 
-    const strip = factStrip([
-        { label: 'Operation', value: operationLabel(w.operation) },
-        { label: 'Solution', value: a.solutionName },
-        { label: 'Environment', value: a.environment || 'Connected environment' },
-    ]);
 
     const table = dataTable(['Item', 'Outcome', 'Message'], attentionFirst(a.results), o => [el('span', 'cell-strong', o.label), outcomeChip(o.status), o.stateChange === 'back-on' ? `${o.message} The flow was turned off for the write and is on again.` : o.message]);
     const left = a.results.filter(r => r.stateChange === 'left-off');
@@ -51,7 +45,7 @@ export function resultStep(a: ResultArgs, h: ResultHandlers): HTMLElement {
 
     return stepFrame(
         'result',
-        [...(leftOff ? [leftOff] : []), bar, figs, strip, detailBlock('Rows', sum.total, tableWrap(table), false, 'list')],
+        [...(leftOff ? [leftOff] : []), bar, figs, detailBlock('Rows', sum.total, tableWrap(table), false, 'list')],
         [
             stepButton('Save report', 'secondary', 'save', h.saveReport, { title: 'A file with the outcome of every row' }),
             spacer(),

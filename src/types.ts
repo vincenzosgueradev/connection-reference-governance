@@ -59,6 +59,8 @@ export interface SnapshotInput {
     readonly references: readonly ConnectionReferenceRow[];
     /** Ids of references that are members of the solution. */
     readonly memberReferenceIds: readonly string[];
+    /** The `componenttype` of every member as stored in `solutioncomponent` (lower case object id -> code). Read, never guessed. */
+    readonly memberTypes?: Readonly<Record<string, number>>;
     readonly flows: readonly FlowRow[];
     /** Keyed by connectionId. Empty when no verified source exists. */
     readonly connections: Readonly<Record<string, ConnectionInfo>>;
@@ -102,13 +104,16 @@ export interface Snapshot {
     readonly references: readonly ReferenceView[];
     /** References of the environment, used as candidates for targets and connection ids. */
     readonly allReferences: readonly ConnectionReferenceRow[];
+    /** The component type of every member of the solution, as stored (lower case object id -> code). */
+    readonly componentTypes: Readonly<Record<string, number>>;
 }
 
 export interface PlanRow {
     /** Row id in Dataverse. */
     readonly id: string;
     readonly label: string;
-    readonly field: 'connectionid' | 'clientdata';
+    /** `membership` (remove from the solution) and `row` (delete the row) write nothing into a column (feature 016). */
+    readonly field: 'connectionid' | 'clientdata' | 'membership' | 'row';
     readonly oldValue: string;
     readonly newValue: string;
     /** The exact value written to `field`. */
@@ -122,16 +127,22 @@ export interface PlanRow {
     readonly blocked?: string;
     /** The flow is on: with the user's permission it is turned off for the write and on again after it (feature 011). */
     readonly turnOff?: boolean;
+    /** The table of the row when it is not the one of the plan (remove and delete may hold both kinds). */
+    readonly entity?: 'connectionreference' | 'workflow';
+    /** The `componenttype` of the member, as stored (remove, and delete for the dependency check). */
+    readonly componentType?: number;
 }
 
 export interface Plan {
-    readonly kind: 'connection' | 'repoint';
+    readonly kind: 'connection' | 'repoint' | 'remove' | 'delete';
     readonly entity: 'connectionreference' | 'workflow';
     readonly rows: readonly PlanRow[];
     /** Things the user should read before confirming; they do not block. */
     readonly warnings: readonly string[];
     /** The user allowed the tool to turn flows that are on off and on again (feature 011). */
     readonly manageState?: boolean;
+    /** Remove only: the solution the components leave. */
+    readonly solution?: { readonly id: string; readonly uniqueName: string };
 }
 
 export interface RowOutcome {

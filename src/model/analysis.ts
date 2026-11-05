@@ -45,7 +45,7 @@ export function buildSnapshot(input: SnapshotInput, expectedOwner = ''): Snapsho
             flags: referenceFlags(reference, input, expectedOwner),
         }));
 
-    return { solution: input.solution, flows, references, allReferences: input.references };
+    return { solution: input.solution, flows, references, allReferences: input.references, componentTypes: input.memberTypes ?? {} };
 }
 
 /** Distinct owner names found in the data, for the expected-owner picker. */
