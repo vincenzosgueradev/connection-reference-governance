@@ -1,6 +1,7 @@
 import { createController } from './controller';
 import { createHost } from './host';
-import { attachLog, log } from './services/log';
+import { log } from './services/log';
+import { mountLogDock } from './views/logDock';
 import { initialState } from './state/reducer';
 import { createStore } from './state/store';
 import { installErrorBoundary } from './views/errorBoundary';
@@ -12,8 +13,8 @@ function init(): void {
     const host = createHost();
     const version = document.getElementById('app-version');
     if (version) version.textContent = `v${__APP_VERSION__}`;
-    const logPanel = document.getElementById('log');
-    if (logPanel) attachLog(logPanel);
+    const dock = document.getElementById('log-dock');
+    if (dock) mountLogDock(dock, (name, content) => host.saveFile(name, content));
 
     // The environment the tool works on is always visible in the header.
     const badge = connectionBadge('Connecting...', 'loading');

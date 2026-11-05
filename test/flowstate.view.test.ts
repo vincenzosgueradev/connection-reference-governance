@@ -15,70 +15,85 @@ async function inStudio(flows = [mk(10, 1), mk(11, 0)], opts: Parameters<typeof 
     buttonByText(a.root, 'Choose changes...')!.click();
     byLabel(a.root, 'Replace Ref 1').click();
     byLabel(a.root, 'Use Ref 2').click();
-    a.store.dispatch({ type: 'studioGo', step: 1 }); // the summary: that is where the permission is asked
     return a;
 }
-const permission = (root: ParentNode) => q(root, '.studio-state .toggle') as HTMLButtonElement;
+const permission = (root: ParentNode) => q(root, '.modal .studio-state .toggle') as HTMLButtonElement;
 
-describe('the permission in the studio', () => {
-    it('is a block that is always there, off by default, with the number of flows that are on', async () => {
+describe('the permission is asked in the confirmation, not in the studio', () => {
+    it('the studio has no such block, at any step', async () => {
         const a = await inStudio();
-        expect(q(a.root, '.studio-state')).not.toBeNull();
-        expect(permission(a.root).getAttribute('aria-checked')).toBe('false');
-        expect(q(a.root, '.studio-state')!.textContent).toContain('1 selected flow is turned on');
-        expect(a.store.get().manageState).toBe(false);
-    });
-    it('turning it on sets the choice, and the plan then writes the flow that is on and marks it', async () => {
-        const a = await inStudio();
-        permission(a.root).click();
-        expect(a.store.get().manageState).toBe(true);
-        buttonByText(a.root, 'Review changes')!.click();
-        await settle();
-        expect(a.store.get().plan!.rows.map(r => [r.label, r.blocked, r.turnOff])).toEqual([['Flow 10', undefined, true], ['Flow 11', undefined, undefined]]);
-    });
-    it('without it the flow that is on stays blocked, as before', async () => {
-        const a = await inStudio();
-        buttonByText(a.root, 'Review changes')!.click();
-        await settle();
-        expect(a.store.get().plan!.rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first.', undefined]);
-    });
-    it('is closed and says so when no selected flow is on', async () => {
-        const a = await inStudio([mk(10, 0), mk(11, 0)]);
-        expect(permission(a.root).disabled).toBe(true);
-        expect(q(a.root, '.studio-state')!.textContent).toContain('No selected flow is turned on');
-    });
-    it('has the same shape whatever the flows, and is not in the change of connection', async () => {
-        const a = await inStudio();
-        const on = qa(a.root, '.studio-state *').map(e => e.tagName).join('|');
-        a.store.dispatch({ type: 'closeStudio' });
-        const b = await inStudio([mk(10, 0)]);
-        expect(qa(b.root, '.studio-state *').map(e => e.tagName).join('|')).toBe(on);
-        b.store.dispatch({ type: 'closeStudio' });
-        b.store.dispatch({ type: 'setView', view: 'references' });
-        b.store.dispatch({ type: 'selectAll', ids: [guid(1)] });
-        buttonByText(b.root, 'Choose changes...')!.click();
-        expect(q(b.root, '.studio-state')).toBeNull();
-    });
-    it('is asked on the summary only, not at every connector', async () => {
-        const a = await inStudio();
-        expect(q(a.root, '.studio-state')).not.toBeNull();
+        expect(q(a.root, '.studio-state')).toBeNull();
         a.store.dispatch({ type: 'studioGo', step: 0 });
         expect(q(a.root, '.studio-state')).toBeNull();
-        a.store.dispatch({ type: 'studioGo', step: 1 });
-        expect(q(a.root, '.studio-state')).not.toBeNull();
+    });
+    it('the confirmation shows it, off, with the number of flows that are on', async () => {
+        const a = await inStudio();
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        expect(q(a.root, '.modal .studio-state')!.textContent).toContain('1 flow is turned on');
+        expect(a.store.get().manageState).toBe(false);
+        expect(permission(a.root).getAttribute('aria-pressed') ?? permission(a.root).getAttribute('aria-checked')).not.toBe('true');
+    });
+    it('turning it on reads the preview again: the flow that is on is now written and marked', async () => {
+        const a = await inStudio();
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        expect(a.store.get().plan!.rows.filter(r => r.blocked === undefined)).toHaveLength(1);
+        permission(a.root).click();
+        const plan = a.store.get().plan!;
+        expect(a.store.get().manageState).toBe(true);
+        expect(plan.rows.filter(r => r.blocked === undefined)).toHaveLength(2);
+        expect(plan.rows.filter(r => r.turnOff === true)).toHaveLength(1);
+        expect(a.store.get().wizard!.confirmOpen).toBe(true);
+    });
+    it('turning it on again clears what was ticked: the plan it applies to has changed', async () => {
+        const a = await inStudio();
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        a.store.dispatch({ type: 'setAck', on: true });
+        permission(a.root).click();
+        expect(a.store.get().planAck).toBe(false);
+    });
+    it('is not shown when no flow of the plan is on, and not in the change of connection', async () => {
+        const a = await inStudio([mk(10, 0), mk(11, 0)]);
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        expect(q(a.root, '.modal .studio-state')).toBeNull();
+    });
+    it('it does not matter whether the summary was ever visited: Review changes from the first category gets the same dialog', async () => {
+        const a = await app({ flows: [mk(10, 1), mk(11, 0)] });
+        a.store.dispatch({ type: 'selectAll', ids: [guid(10), guid(11)] });
+        buttonByText(a.root, 'Choose changes...')!.click();
+        byLabel(a.root, 'Replace Ref 1').click();
+        byLabel(a.root, 'Use Ref 2').click();
+        expect(a.store.get().studioStep).toBe(0);
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        expect(q(a.root, '.modal .studio-state')).not.toBeNull();
     });
 });
 
 async function toConfirm(flows = [mk(10, 1), mk(11, 0)], opts: Parameters<typeof app>[0] = {}) {
     const a = await inStudio(flows, opts);
-    permission(a.root).click();
     buttonByText(a.root, 'Review changes')!.click();
     await settle();
     buttonByText(a.root, 'Apply...')!.click();
     await settle();
+    if (q(a.root, '.modal .studio-state')) permission(a.root).click();
     return a;
 }
-const toggles = (root: ParentNode) => qa(root, '.modal .toggle');
+/** The acknowledgements in the footer (the permission block has its own toggle). */
+const toggles = (root: ParentNode) => qa(root, '.modal-foot .toggle');
 
 describe('the confirmation when flows will be turned off', () => {
     it('lists what it means, in words, and the flows by name', async () => {
@@ -170,20 +185,21 @@ describe('the report', () => {
 });
 
 describe('when nothing can be written (hand test: "no row can be written")', () => {
-    it('the studio keeps Review changes closed and says why: the flows that use the references are on and the permission is off', async () => {
+    it('the studio keeps Review changes open: the permission is asked in the confirmation, so flows that are on are no reason to stop here', async () => {
         const a = await inStudio([mk(10, 1), mk(11, 1)]);
-        const review = buttonByText(a.root, 'Review changes')!;
-        expect(review.disabled).toBe(true);
-        const line = q(a.root, '.studio-impact .studio-note')!;
-        expect(line.className).not.toContain('is-idle');
-        expect(line.textContent).toContain('2 flows that use these references are turned on');
-        expect(line.textContent).toContain('allow the tool to turn them off');
-    });
-    it('with the permission it opens, and the reason is gone', async () => {
-        const a = await inStudio([mk(10, 1), mk(11, 1)]);
-        permission(a.root).click();
         expect(buttonByText(a.root, 'Review changes')!.disabled).toBe(false);
-        expect(q(a.root, '.studio-impact .studio-note')!.className).toContain('is-idle');
+    });
+    it('the Preview of flows that are all on keeps Apply open, to reach the permission', async () => {
+        const a = await inStudio([mk(10, 1), mk(11, 1)]);
+        buttonByText(a.root, 'Review changes')!.click();
+        await settle();
+        expect(q(a.root, '.callout--error.nothing-written')).not.toBeNull();
+        expect(buttonByText(a.root, 'Apply...')!.disabled).toBe(false);
+        buttonByText(a.root, 'Apply...')!.click();
+        await settle();
+        expect((buttonByText(a.root, 'Apply to 0 flows') ?? buttonByText(a.root, 'Apply to 0'))!.disabled).toBe(true);
+        permission(a.root).click();
+        expect(a.store.get().plan!.rows.filter(r => r.blocked === undefined)).toHaveLength(2);
     });
     it('a mix is fine: the flow that is off is written, so Review changes opens even without the permission', async () => {
         const a = await inStudio([mk(10, 1), mk(11, 0)]);
@@ -196,9 +212,9 @@ describe('when nothing can be written (hand test: "no row can be written")', () 
         await settle();
         const c = q(a.root, '.callout--error.nothing-written')!;
         expect(c.querySelector('.callout-title')!.textContent).toBe('No row can be written');
-        expect(c.textContent).toContain('2 flows: The flow is turned on: turn it off first.');
-        expect(c.textContent).toContain('Go back and allow the tool to turn the flows off');
-        expect(buttonByText(a.root, 'Apply...')!.disabled).toBe(true);
+        expect(c.textContent).toContain('2 flows: The flow is turned on: turn it off first');
+        expect(c.textContent).toContain('Apply... lets you allow the tool to turn the flows off');
+        expect(buttonByText(a.root, 'Apply...')!.disabled).toBe(false);
     });
     it('the banner is not shown when some row can be written', async () => {
         const { planRepointGroups } = await import('../src/model/plans');

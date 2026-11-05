@@ -18,14 +18,29 @@ connection behind each one, flags the ones that need attention, and re-points th
 - Works on **unmanaged** solutions only. Managed solutions are not offered: the home screen shows a disabled Managed
   tab with their count and says why, and they cannot be opened. The planners still refuse managed rows, as a second guard.
 - Desktop flows are out of scope and are not listed.
-- It changes existing connection references and the flows that point at them. It does not create, delete or
-  export anything else.
+- It changes existing connection references and the flows that point at them. Since 1.4.0 it can also take flows and
+  connection references out of the open solution, and delete them (T2b). It does not create or export anything.
 
-### T2. Two distinct bulk operations, never mixed
+### T2. Distinct bulk operations, never mixed
 1. **Change the connection of a reference**: update `connectionid` on a `connectionreference` row. Every flow using that
    reference follows.
 2. **Re-point a flow to another reference**: rewrite the connection reference name inside the flow's `clientdata`.
 Each is its own plan/apply flow with its own preview. A single confirmation never covers both.
+
+### T2b. Taking away: remove from the solution and delete (added 1.4.0, feature 016)
+- **Remove from this solution** deletes the `solutioncomponent` membership (Web API action `RemoveSolutionComponent`,
+  verified on Microsoft Learn); the row stays in the environment. The `ComponentType` sent is the one stored on the
+  member's own `solutioncomponent` row, never a hard-coded code; a member whose type was not read is blocked.
+- **Delete** removes the row from the environment and so from every solution. It is never undone, so it has its own
+  dialog (danger tone), its own acknowledgement text, and a backup that holds the flow definition or the reference record.
+- A reference used by a flow that is not part of the same selection is blocked for both: re-point those flows first.
+- A flow that is on is turned off first and then deleted (second acknowledgement, never turned on again); a suspended
+  flow is blocked. Managed solutions and managed rows are blocked, as everywhere.
+- A row counts as done only when the environment shows it: the membership is gone, or the row no longer exists.
+- Call shape (Microsoft Learn, 2026-11-05): `SolutionComponent` (a `solutioncomponent` carrying the **object** id, as the
+  SDK sample sets `ComponentId`), `ComponentType`, `SolutionUniqueName`. A test fixes the request. The Learn pages
+  disagree on which id, so the live check in the quickstart stays; a wrong shape is refused per row and the read-back
+  never shows it as done.
 
 ### T3. Plan, preview, confirm, apply (Principle V)
 - Every write is first built as a plan (pure, testable): which rows, which field, old value, new value.
@@ -110,4 +125,4 @@ README, the specs, the research notes, the tests or the commit messages. A Credi
 or images are actually copied and a licence asks for it, and then only with the owner's written consent to be named.
 This tool copies nothing, so its README has no Credits section.
 
-**Version**: 1.3.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-04
+**Version**: 1.4.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-05

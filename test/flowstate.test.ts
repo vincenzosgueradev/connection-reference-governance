@@ -22,7 +22,7 @@ const names = (calls: { updates: { id: string; record: Record<string, unknown> }
 describe('the plan with permission to manage the state', () => {
     it('without permission a flow that is on stays blocked and nothing is marked for turning off', () => {
         const { plan } = setup([mk(10, 1), mk(11, 0)], {}, false);
-        expect(plan.rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first.', undefined]);
+        expect(plan.rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first, or allow the tool to turn it off in the confirmation.', undefined]);
         expect(plan.manageState).toBeFalsy();
         expect(turnOffRows(plan)).toEqual([]);
     });

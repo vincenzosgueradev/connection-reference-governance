@@ -187,7 +187,7 @@ describe('the guided path (wizard) in the state', () => {
 
     it('a new plan opens the Preview step with split layout, nothing collapsed and one page of items', () => {
         const w = open().wizard!;
-        expect(w).toMatchObject({ operation: 'connection', step: 'preview', layout: 'split', modes: {}, collapsed: [], shown: 20, confirmOpen: false, live: [], phase: 'write', finishedAt: null });
+        expect(w).toMatchObject({ operation: 'connection', step: 'preview', layout: 'split', tab: 'diff', collapsed: [], shown: 20, confirmOpen: false, live: [], phase: 'write', finishedAt: null });
         expect(open().plan).not.toBeNull();
     });
     it('the operation of the wizard is the kind of the plan', () => {
@@ -270,11 +270,11 @@ describe('the guided path (wizard) in the state', () => {
     });
 
     describe('the layout of the Preview', () => {
-        it('the layout is one choice for all items; each item has its own mode and card', () => {
+        it('the layout and the tab are one choice for all items; each item has its own card', () => {
             let s = reducer(preview(), { type: 'setLayout', layout: 'unified' });
-            s = reducer(s, { type: 'setItemMode', id: 'x', mode: 'table' });
+            s = reducer(s, { type: 'setTab', tab: 'table' });
             s = reducer(s, { type: 'toggleItem', id: 'x' });
-            expect([s.wizard!.layout, s.wizard!.modes, s.wizard!.collapsed]).toEqual(['unified', { x: 'table' }, ['x']]);
+            expect([s.wizard!.layout, s.wizard!.tab, s.wizard!.collapsed]).toEqual(['unified', 'table', ['x']]);
             s = reducer(s, { type: 'toggleItem', id: 'x' });
             expect(s.wizard!.collapsed).toEqual([]);
         });
@@ -286,7 +286,7 @@ describe('the guided path (wizard) in the state', () => {
         });
         it('none of these do anything without a wizard', () => {
             const s = initialState();
-            for (const a of [{ type: 'setLayout', layout: 'unified' }, { type: 'setItemMode', id: 'x', mode: 'table' }, { type: 'toggleItem', id: 'x' }, { type: 'showMore' }, { type: 'openConfirm' }, { type: 'closeConfirm' }] as const)
+            for (const a of [{ type: 'setLayout', layout: 'unified' }, { type: 'setTab', tab: 'table' }, { type: 'toggleItem', id: 'x' }, { type: 'showMore' }, { type: 'openConfirm' }, { type: 'closeConfirm' }] as const)
                 expect(reducer(s, a), a.type).toBe(s);
         });
     });

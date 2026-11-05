@@ -166,7 +166,7 @@ describe('planRepoint with several references to replace', () => {
     it('keeps every other block: flows that are on, managed, suspended', () => {
         const s = snap([flow(10, ['sample_ref1'], { name: 'On', stateCode: 1 }), flow(11, ['sample_ref1'], { name: 'Susp', stateCode: 2 })]);
         const p = plan(s, [guid(10), guid(11)]);
-        expect(p.rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first.', 'The flow is not off (suspended): turn it off first.']);
+        expect(p.rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first, or allow the tool to turn it off in the confirmation.', 'The flow is not off (suspended): turn it off first.']);
     });
     it('with one chosen reference given as a string it is the same plan as before', () => {
         const s = snap();

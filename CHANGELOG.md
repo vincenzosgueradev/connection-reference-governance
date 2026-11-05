@@ -6,6 +6,7 @@ All notable changes are listed here, newest first. Format: Keep a Changelog; ver
 
 ### Added
 
+- Remove from solution and Delete: two new actions in the bar over the table in the Connection references view. Remove takes the selection out of the open unmanaged solution and leaves the rows in the environment; Delete removes the rows from the environment. Both go through the same preview, confirmation and per-row result; each row is checked just before and read back after. A reference still used by a flow is blocked, and Delete asks for its own acknowledgement and offers a copy of the records first.
 - The choices of a change are made in a studio dialog that can fill the window; the choose screen keeps only a slim selection bar of fixed width with one button, so the table keeps its room and nothing jumps.
 - A shorter path: Review changes opens the exact Preview at once (Choose, Preview, Apply, Result); the separate Review step, which repeated the same list, is gone, and the Preview says why when no row can be written.
 - With your permission (off by default) the tool turns flows that are on off for the change and on again afterwards: a block in the studio, a warning that lists what it means and the flows, a second acknowledgement, a run with six phases, every flow turned off is turned on again even when its write fails, a flow left off is named in the result and in the report.

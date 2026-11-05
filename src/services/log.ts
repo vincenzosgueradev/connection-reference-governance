@@ -1,6 +1,6 @@
 /**
- * Operation log: kept in memory, mirrored in a side panel, exportable. It never leaves the device.
- * Never log tokens, secrets or record contents.
+ * Operation log: kept in memory, shown in the log dock at the bottom of the window, exportable. It never leaves the
+ * device. Never log tokens, secrets or record contents.
  */
 
 export type LogLevel = 'info' | 'success' | 'warning' | 'error';
@@ -11,32 +11,37 @@ export interface LogEntry {
     message: string;
 }
 
-const entries: LogEntry[] = [];
-let mount: HTMLElement | null = null;
+/** The oldest entries go first: the log is for the current session, not an archive. */
+export const MAX_ENTRIES = 500;
 
-export function attachLog(el: HTMLElement): void {
-    mount = el;
+const entries: LogEntry[] = [];
+const listeners = new Set<() => void>();
+
+function notify(): void {
+    for (const fn of listeners) {
+        try {
+            fn();
+        } catch {
+            // a failing listener never stops the tool
+        }
+    }
 }
 
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+/** Calls `fn` after every change; returns the function that stops it. */
+export function subscribeLog(fn: () => void): () => void {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
 }
 
 export function log(message: string, level: LogLevel = 'info'): void {
-    const now = new Date();
-    entries.push({ timestamp: now.toISOString(), level, message });
-    if (!mount) return;
-    const row = document.createElement('div');
-    row.className = `log-entry log-entry--${level}`;
-    row.innerHTML = `<span class="log-timestamp">${now.toTimeString().slice(0, 8)}</span>${escapeHtml(message)}`;
-    mount.appendChild(row);
-    mount.scrollTop = mount.scrollHeight;
+    entries.push({ timestamp: new Date().toISOString(), level, message });
+    if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
+    notify();
 }
 
 export function clearLog(): void {
     entries.length = 0;
-    if (mount) mount.innerHTML = '';
+    notify();
 }
 
 export function getEntries(): readonly LogEntry[] {

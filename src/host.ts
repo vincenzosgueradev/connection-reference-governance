@@ -5,10 +5,22 @@
 
 export type Record_ = Record<string, unknown>;
 
+/** A component that depends on the one asked about. */
+export interface Dependent {
+    readonly id: string;
+    readonly type: number;
+}
+
 export interface Host {
     /** OData query against the connected environment, e.g. `workflows?$select=name`. */
     query(odata: string): Promise<Record_[]>;
     update(entity: string, id: string, record: Record_): Promise<void>;
+    /** Deletes a row of the connected environment. */
+    remove(entity: string, id: string): Promise<void>;
+    /** Takes a component out of an unmanaged solution (RemoveSolutionComponent); the component itself stays in the environment. */
+    removeFromSolution(solutionUniqueName: string, componentId: string, componentType: number): Promise<void>;
+    /** The components that would stop a component from being deleted (RetrieveDependenciesForDelete). Rejects when it cannot be read. */
+    dependencies(componentType: number, id: string): Promise<Dependent[]>;
     /** Id of the signed-in user (WhoAmI), lower case. Empty when unknown. */
     currentUserId(): Promise<string>;
     /** Lets the user save a text file; returns false when cancelled. */
@@ -29,6 +41,23 @@ export function createHost(): Host {
         },
         async update(entity, id, record) {
             await window.dataverseAPI.update(entity, id, record);
+        },
+        async remove(entity, id) {
+            await window.dataverseAPI.delete(entity, id);
+        },
+        async removeFromSolution(solutionUniqueName, componentId, componentType) {
+            // Learn: RemoveSolutionComponent takes the component as a solutioncomponent whose id is the component id.
+            await window.dataverseAPI.execute({
+                operationName: 'RemoveSolutionComponent',
+                operationType: 'action',
+                parameters: { SolutionComponent: { '@odata.type': 'Microsoft.Dynamics.CRM.solutioncomponent', solutioncomponentid: componentId }, ComponentType: componentType, SolutionUniqueName: solutionUniqueName },
+            });
+        },
+        async dependencies(componentType, id) {
+            // A function of the Web API, called as a plain GET; the result is the list of dependency records.
+            const call = `RetrieveDependenciesForDelete(ObjectId=${id},ComponentType=${componentType})`;
+            const res = await window.dataverseAPI.queryData(call);
+            return res.value.map(r => ({ id: String(r['dependentcomponentobjectid'] ?? '').toLowerCase(), type: Number(r['dependentcomponenttype'] ?? 0) }));
         },
         async currentUserId() {
             const r = await window.dataverseAPI.execute({ operationName: 'WhoAmI', operationType: 'function' });

@@ -102,3 +102,11 @@ Every requirement above is covered by tests; mutation checks guard the rules tha
 - test/result.test.ts
 - test/dataverse.test.ts "applyPlan progress"
 - test/ui.kit.test.ts (pipeline)
+
+## Amendment 2026-11-05 (hand look: room and life in the run)
+
+The rows of the run are no longer an empty table that fills up: every row of the plan is listed from the start, greyed and marked "Waiting"; the row being written has a spinner and a highlighted border; each row takes the colour of its outcome (done, skipped, failed) with its message as soon as it is finished. The rows sit in a grid that puts several per line on a wide window, above the timeline. A row that is not in the plan (an unexpected outcome) is appended.
+
+## Amendment 2026-11-05 (hand look: one progress panel)
+
+The banner, the Rows block and the Progress block are one panel. At the top a ring shows the percentage (it pulses while it runs and turns green at the end), with the headline, what is happening now, the environment and the note not to close the tool, and three counters (written, skipped, failed). Under it, the phases of the run with the time; under that, every row from the start (waiting, working, then coloured by its outcome) with "n of m" in its header.

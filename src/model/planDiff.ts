@@ -68,6 +68,13 @@ export function planItems(plan: Plan, snapshot: Snapshot): PlanItem[] {
     return plan.rows.map(r => {
         const base = { id: r.id, title: r.label, sub: r.id };
         if (r.blocked !== undefined) return { ...base, blocked: r.blocked, before: '', after: '', fields: [] };
+        if (plan.kind === 'remove' || plan.kind === 'delete') {
+            const table = r.entity ?? plan.entity;
+            const doc = (present: boolean) => JSON.stringify(plan.kind === 'remove'
+                ? { id: r.id, name: r.label, table, solution: plan.solution?.uniqueName ?? '', componentType: r.componentType ?? null, inSolution: present }
+                : { id: r.id, name: r.label, table, exists: present }, null, 2);
+            return { ...base, before: doc(true), after: plan.kind === 'remove' ? doc(false) : '', fields: [{ what: plan.kind === 'remove' ? 'solution membership' : 'row', before: r.oldValue, after: r.newValue }] };
+        }
         if (plan.kind === 'connection') {
             const logical = snapshot.references.find(x => x.reference.id === r.id)?.reference.logicalName ?? '';
             const doc = (connectionid: string) => JSON.stringify({ connectionreferenceid: r.id, connectionreferencelogicalname: logical, connectionid }, null, 2);

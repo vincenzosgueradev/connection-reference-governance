@@ -93,8 +93,10 @@ describe('the pipeline of categories (feature 014)', () => {
     const items = (root: ParentNode) => qa(root, '.studio-pipe-item');
     const stepsText = (root: ParentNode) => items(root).map(i => q(i, '.studio-pipe-name')!.textContent);
     const statusOf = (root: ParentNode) => items(root).map(i => i.className.match(/is-(done|warn|empty)/)?.[1] ?? 'pending');
-    const next = (a: Awaited<ReturnType<typeof app>>) => buttonByText(a.root, 'Next')!;
-    const back = (a: Awaited<ReturnType<typeof app>>) => buttonByText(a.root, 'Back')!;
+    /** One step forward, as a click on the next item of the pipeline. */
+    const next = (a: Awaited<ReturnType<typeof app>>) => ({ click: () => (items(a.root)[Math.min(a.store.get().studioStep + 1, items(a.root).length - 1)] as HTMLElement).click() });
+    /** Moving between the categories and the summary is done with the pipeline. */
+    const goTo = (a: Awaited<ReturnType<typeof app>>, i: number) => (items(a.root)[i]!.querySelector('button') ?? items(a.root)[i]!).click();
     const sources = (root: ParentNode) => qa(root, '.studio-panel .source-name').map(e => e.textContent);
 
     it('shows one step per connector and then the summary, the first one current', async () => {
@@ -109,40 +111,36 @@ describe('the pipeline of categories (feature 014)', () => {
         next(a).click();
         expect(sources(a.root)).toEqual(['Ref 4']);
     });
-    it('Back is closed on the first step; Next goes forward and Back returns, keeping the choices', async () => {
+    it('there are no Back and Next buttons: the pipeline moves between the steps, keeping the choices', async () => {
         const a = await start();
-        expect(back(a).disabled).toBe(true);
+        expect(buttonByText(a.root, 'Back')).toBeUndefined();
+        expect(buttonByText(a.root, 'Next')).toBeUndefined();
         byLabel(a.root, 'Replace Ref 1').click();
         byLabel(a.root, 'Use Ref 2').click();
-        next(a).click();
+        goTo(a, 1);
         expect(a.store.get().studioStep).toBe(1);
-        expect(back(a).disabled).toBe(false);
-        back(a).click();
+        goTo(a, 0);
         expect(byLabel(a.root, 'Replace Ref 1').getAttribute('aria-checked')).toBe('true');
         expect(byLabel(a.root, 'Use Ref 2').getAttribute('aria-checked')).toBe('true');
     });
     it('says where you are: Category 1 of 2, then the summary', async () => {
         const a = await start();
         expect(q(a.root, '.studio-where')!.textContent).toBe('Category 1 of 2');
-        next(a).click();
-        next(a).click();
+        goTo(a, 2);
         expect(q(a.root, '.studio-where')!.textContent).toBe('Summary');
     });
     it('a step with nothing chosen can be passed: the category is not changed', async () => {
         const a = await start();
-        expect(next(a).disabled).toBe(false);
-        next(a).click();
+        goTo(a, 1);
         expect(a.store.get().repointGroups).toEqual([]);
         expect(statusOf(a.root)).toEqual(['empty', 'pending', 'pending']);
     });
-    it('references ticked without a new reference stop Next, say why, and mark the step incomplete', async () => {
+    it('references ticked without a new reference say what is missing and mark the step incomplete', async () => {
         const a = await start();
         byLabel(a.root, 'Replace Ref 1').click();
-        expect(next(a).disabled).toBe(true);
         expect(q(a.root, '.studio-nav-note')!.textContent).toContain('Choose the reference to use instead');
         expect(statusOf(a.root)[0]).toBe('warn');
         byLabel(a.root, 'Use Ref 2').click();
-        expect(next(a).disabled).toBe(false);
         expect(statusOf(a.root)[0]).toBe('done');
     });
     it('the right side offers only the references of this connector, and nothing until one is ticked', async () => {
@@ -183,12 +181,13 @@ describe('the pipeline of categories (feature 014)', () => {
         buttonByText(a.root, 'Clear')!.click();
         expect(a.store.get().repointGroups).toEqual([]);
     });
-    it('Select every category ticks all of them from any step, Clear all removes every choice', async () => {
+    it('there is no select-everything button over the pipeline: each category has its own Select all and Clear', async () => {
         const a = await start();
-        buttonByText(a.root, 'Select every category')!.click();
-        expect(a.store.get().repointGroups.map(g => g.from)).toEqual([['sample_ref1'], ['sample_ref4']]);
-        expect(a.store.get().studioStep).toBe(0);
-        buttonByText(a.root, 'Clear all')!.click();
+        expect(buttonByText(a.root, 'Select every category')).toBeUndefined();
+        expect(buttonByText(a.root, 'Clear all')).toBeUndefined();
+        buttonByText(a.root, 'Select all')!.click();
+        expect(a.store.get().repointGroups.map(g => g.from)).toEqual([['sample_ref1']]);
+        buttonByText(a.root, 'Clear')!.click();
         expect(a.store.get().repointGroups).toEqual([]);
     });
     it('the figures are under every step, in the same place, and there is no overview any more', async () => {
@@ -204,13 +203,12 @@ describe('the pipeline of categories (feature 014)', () => {
         expect(shapeOf()).toBe(before);
         expect(q(a.root, '.studio-overview')).toBeNull();
     });
-    it('Back and Next live in the bar at the bottom with Cancel and Review changes, not in the body', async () => {
+    it('the bar at the bottom holds where you are, Cancel and Review changes, and nothing that repeats the pipeline', async () => {
         const a = await start();
         const foot = q(a.root, '.modal-foot')!;
-        expect(foot.contains(back(a))).toBe(true);
-        expect(foot.contains(next(a))).toBe(true);
+        expect(foot.contains(buttonByText(a.root, 'Review changes')!)).toBe(true);
         expect(foot.contains(buttonByText(a.root, 'Cancel')!)).toBe(true);
-        expect(q(a.root, '.modal-body')!.contains(back(a))).toBe(false);
+        expect([...foot.querySelectorAll('button')].map(b => b.textContent?.trim())).toEqual(['Cancel', 'Review changes']);
         expect(q(a.root, '.studio-where')!.textContent).toBe('Category 1 of 2');
     });
     it('the connector is shown by the pipeline only: the step has no bar with its name again', async () => {
@@ -299,11 +297,11 @@ describe('the motion between steps (feature 014)', () => {
     it('forward slides in from the right, back from the left, and a plain redraw does not play it again', async () => {
         const a = await start();
         expect(panel(a).className).not.toMatch(/slide--/);
-        buttonByText(a.root, 'Next')!.click();
+        (qa(a.root, '.studio-pipe-item')[1] as HTMLElement).click();
         expect(panel(a).className).toContain('slide--next');
         byLabel(a.root, 'Replace Ref 4').click();
         expect(panel(a).className).not.toMatch(/slide--/);
-        buttonByText(a.root, 'Back')!.click();
+        (qa(a.root, '.studio-pipe-item')[0] as HTMLElement).click();
         expect(panel(a).className).toContain('slide--prev');
     });
     it('the CSS plays the motion and switches it off for reduced motion', async () => {

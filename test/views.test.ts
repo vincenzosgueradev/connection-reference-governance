@@ -13,7 +13,7 @@ import type { SolutionInfo } from '../src/types';
 function setup(managed = false, flows = [flow(10, ['sample_ref1']), flow(11, ['sample_ref1', 'ghost'])]) {
     const sol = solution(managed);
     const store = createStore(initialState());
-    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
+    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
     const root = document.createElement('div');
     document.body.append(root);
     mountMain(root, store, h, () => 'Test (Dev)');
@@ -119,7 +119,7 @@ describe('solutions list and navigation', () => {
         { ...solution(false), id: guid(2), name: 'Beta', uniqueName: 'beta', publisher: 'P2', createdOn: iso(40 * 86400000) },
         { ...solution(true), id: guid(3), name: 'Gamma', uniqueName: 'gamma', publisher: 'P1' },
     ];
-    const handlers = (): Handlers => ({ selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() });
+    const handlers = (): Handlers => ({ selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() });
     function list(counts: Record<string, number> | null = { [guid(1)]: 2, [guid(2)]: 7 }) {
         document.body.innerHTML = '<nav id="breadcrumb" class="breadcrumb" hidden></nav>';
         const store = createStore(initialState());
@@ -368,7 +368,7 @@ describe('records: one row per flow or reference, details under it', () => {
         const sol = solution();
         const store = createStore(initialState());
         const root = document.createElement('div');
-        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
         const base = input({ solution: sol, flows: [mk(10, ['sample_ref1'], REQUEST, { name: 'Alpha flow' })] });
@@ -383,7 +383,7 @@ describe('references table and its details', () => {
         const sol = solution();
         const store = createStore(initialState());
         const root = document.createElement('div');
-        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
         const base = input({ solution: sol, flows: [flow(10, ['sample_ref1', 'sample_ref2'], { name: 'Alpha flow' }), flow(11, ['sample_ref1'], { name: 'Beta flow' })] });
@@ -444,7 +444,7 @@ describe('long values are shown in full and the layout adapts', () => {
         const sol = solution();
         const store = createStore(initialState());
         const root = document.createElement('div');
-        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
         const base = input({ solution: sol, flows: [flow(10, ['sample_ref1'], { name: 'F1' })] });
@@ -475,7 +475,7 @@ describe('the view keeps its place when it is rebuilt', () => {
             const sol = solution();
             const store = createStore(initialState());
             const root = document.getElementById('content')!;
-            mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+            mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
             store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
             store.dispatch({ type: 'selectSolution', id: sol.id });
             store.dispatch({ type: 'snapshotLoaded', snapshot: buildSnapshot(input({ solution: sol })) });
@@ -485,6 +485,42 @@ describe('the view keeps its place when it is rebuilt', () => {
             store.dispatch({ type: 'toggle', id: guid(10) });
             expect(page.scrollTop).toBe(340);
             expect((root.querySelector('.table-wrap') as HTMLElement).scrollTop).toBe(120);
+        } finally {
+            delete (HTMLElement.prototype as unknown as Record<string, unknown>)['scrollTop'];
+        }
+    });
+});
+
+describe('scroll when the page changes', () => {
+    it('a different page (the other view, a step, another solution) opens at the top; the same page keeps its place', () => {
+        const tops = new WeakMap<Element, number>();
+        Object.defineProperty(HTMLElement.prototype, 'scrollTop', { configurable: true, get() { return tops.get(this) ?? 0; }, set(v: number) { tops.set(this, v); } });
+        try {
+            document.body.innerHTML = '<main class="main-content"><div id="content"></div></main>';
+            const sol = solution();
+            const store = createStore(initialState());
+            const root = document.getElementById('content')!;
+            mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+            store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
+            store.dispatch({ type: 'selectSolution', id: sol.id });
+            store.dispatch({ type: 'snapshotLoaded', snapshot: buildSnapshot(input({ solution: sol })) });
+            const page = () => document.querySelector('.main-content') as HTMLElement;
+            const wrap = () => root.querySelector('.table-wrap') as HTMLElement;
+            page().scrollTop = 200;
+            wrap().scrollTop = 90;
+            store.dispatch({ type: 'toggle', id: guid(10) }); // the same page
+            expect([page().scrollTop, wrap().scrollTop]).toEqual([200, 90]);
+            store.dispatch({ type: 'setView', view: 'references' }); // another page
+            expect([page().scrollTop, wrap().scrollTop]).toEqual([0, 0]);
+            wrap().scrollTop = 60;
+            store.dispatch({ type: 'selectAll', ids: [guid(1)] });
+            store.dispatch({ type: 'openPlan', plan: planConnectionChange(store.get().snapshot!, [guid(1)], 'conn-2') }); // a step
+            const body = root.querySelector('.step-body') as HTMLElement;
+            body.scrollTop = 33;
+            store.dispatch({ type: 'toggleItem', id: 'x' });
+            expect((root.querySelector('.step-body') as HTMLElement).scrollTop).toBe(33);
+            store.dispatch({ type: 'setTab', tab: 'table' }); // another tab of the step
+            expect((root.querySelector('.step-body') as HTMLElement).scrollTop).toBe(0);
         } finally {
             delete (HTMLElement.prototype as unknown as Record<string, unknown>)['scrollTop'];
         }
@@ -527,7 +563,7 @@ describe('stable layout (constitution VII)', () => {
         document.body.innerHTML = '';
         const store = createStore(initialState());
         const root = document.createElement('div');
-        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         const idle = root.querySelectorAll('.toolbar > *').length;
         store.dispatch({ type: 'busy', busy: true });
         expect(root.querySelectorAll('.toolbar > *').length).toBe(idle);
@@ -654,7 +690,7 @@ describe('icons', () => {
         const sol = solution();
         const store = createStore(initialState());
         const r2 = document.createElement('div');
-        mountMain(r2, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(r2, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
         const base = input({ solution: sol, flows: [mk(10, REQUEST)] });
@@ -683,7 +719,8 @@ describe('icons', () => {
         store.dispatch({ type: 'toggle', id: guid(1) });
         openConfirm(store, planConnectionChange(store.get().snapshot!, [guid(1), guid(2)], 'conn-2'));
         expect(root.querySelector('.modal-badge .icon-link')).not.toBeNull();
-        expect(root.querySelector('.modal .change-arrow')).not.toBeNull();
+        store.dispatch({ type: 'setTab', tab: 'table' });
+        expect(root.querySelector('.change-arrow')).not.toBeNull();
         expect(root.querySelector('.modal .btn--danger .icon-check')).not.toBeNull();
         expect(root.querySelector('.modal .btn .icon-save')).not.toBeNull();
         store.dispatch({ type: 'setAck', on: true });
@@ -714,7 +751,7 @@ describe('icons', () => {
 describe('re-point: only compatible choices (defect reported in a hand test)', () => {
     const B = '/providers/Microsoft.PowerApps/apis/shared_b';
     const refs = [ref(1), ref(2), ref(3, { connectorId: B }), ref(4, { connectorId: B })];
-    const noop = () => ({ selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() });
+    const noop = () => ({ selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() });
     function view(extraFlows = [flow(10, ['sample_ref1'], { name: 'F10' }), flow(11, ['sample_ref3'], { name: 'F11' })], references = refs) {
         const sol = solution();
         const store = createStore(initialState());

@@ -1,5 +1,5 @@
 import type { Host, Record_ } from '../host';
-import type { ConnectionReferenceRow, FlowRow, Plan, Result, RowOutcome, SnapshotInput, SolutionInfo } from '../types';
+import type { ConnectionReferenceRow, FlowRow, Plan, Result, RowOutcome, Snapshot, SnapshotInput, SolutionInfo } from '../types';
 import { readReferenceNames } from '../model/clientdata';
 import { turnOffRows, writableRows } from '../model/plans';
 
@@ -127,6 +127,11 @@ export async function loadSnapshotInput(host: Host, solution: SolutionInfo): Pro
         const components = await host.query(`solutioncomponents?$select=objectid,componenttype&$filter=_solutionid_value eq ${solution.id}`);
         const memberIds = components.map(c => str(c['objectid']).toLowerCase()).filter(id => GUID.test(id));
         const memberSet = new Set(memberIds);
+        const memberTypes: Record<string, number> = {};
+        for (const c of components) {
+            const id = str(c['objectid']).toLowerCase();
+            if (GUID.test(id) && typeof c['componenttype'] === 'number') memberTypes[id] = c['componenttype'];
+        }
 
         const refRows = await host.query(
             'connectionreferences?$select=connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,ismanaged,_ownerid_value,_customconnectorid_value',
@@ -161,7 +166,7 @@ export async function loadSnapshotInput(host: Host, solution: SolutionInfo): Pro
         const named = flows.map(f => ({ ...f, ownerName: owners.get(f.ownerId) ?? '' }));
         named.sort((a, b) => a.name.localeCompare(b.name));
         // No verified source for connection owner/state yet (specs/000-connection-reference-governance/research.md).
-        return { ok: true, value: { solution, references, memberReferenceIds, flows: named, connections: {} } };
+        return { ok: true, value: { solution, references, memberReferenceIds, memberTypes, flows: named, connections: {} } };
     } catch (e) {
         return { ok: false, error: `Could not read the solution: ${message(e)}` };
     }
@@ -262,6 +267,11 @@ export async function applyPlan(host: Host, plan: Plan, onRow?: (outcome: RowOut
             out('skipped', row.blocked ?? 'Blocked.');
             continue;
         }
+        if (plan.kind === 'remove' || plan.kind === 'delete') {
+            const r = await removalRow(host, plan, row);
+            out(r.status, r.message);
+            continue;
+        }
         try {
             const before = await readCurrent(host, plan.entity, row);
             if (before === undefined) {
@@ -281,6 +291,16 @@ export async function applyPlan(host: Host, plan: Plan, onRow?: (outcome: RowOut
         }
     }
 
+    // A deleted flow is not turned on again: it is gone (or, when the delete failed, it stays off and the result says so).
+    if (plan.kind === 'delete') {
+        for (const row of plan.rows) {
+            const result = held.get(row.id);
+            if (!result) continue;
+            emit(result.status === 'done' ? result : { ...result, message: `${result.message} The flow was turned off by this run and is still off.`, stateChange: 'left-off' });
+        }
+        return outcomes;
+    }
+
     // 3. turn on again every flow that was turned off, whatever happened to its write
     if (turnedOff.size > 0) {
         onPhase?.('on');
@@ -298,6 +318,82 @@ export async function applyPlan(host: Host, plan: Plan, onRow?: (outcome: RowOut
         }
     }
     return outcomes;
+}
+
+/** The component type to ask about for a row: what the solution stored; a flow is a workflow whatever it says. */
+const typeOf = (snapshotTypes: Readonly<Record<string, number>>, id: string, isFlow: boolean): number | undefined => snapshotTypes[id.toLowerCase()] ?? (isFlow ? WORKFLOW_COMPONENT_TYPE : undefined);
+
+/** What depends on each row, read from the environment; a row that cannot be read is undefined (and is never deleted). */
+export async function readDependencies(host: Host, snapshot: Snapshot, ids: readonly string[]): Promise<Record<string, readonly { id: string; type: number }[] | undefined>> {
+    const out: Record<string, readonly { id: string; type: number }[] | undefined> = {};
+    // independent questions: asked a few at a time, not one after the other
+    const ask = async (id: string) => {
+        const type = typeOf(snapshot.componentTypes, id, snapshot.flows.some(f => f.flow.id === id));
+        if (type === undefined || !GUID.test(id)) { out[id] = undefined; return; }
+        try {
+            out[id] = await host.dependencies(type, id);
+        } catch {
+            out[id] = undefined;
+        }
+    };
+    for (let i = 0; i < ids.length; i += 5) await Promise.all(ids.slice(i, i + 5).map(ask));
+    return out;
+}
+
+const tableOf = (plan: Plan, row: { entity?: Plan['entity'] }): Plan['entity'] => row.entity ?? plan.entity;
+
+async function rowExists(host: Host, table: Plan['entity'], id: string): Promise<boolean> {
+    const set = table === 'workflow' ? 'workflows' : 'connectionreferences';
+    const key = table === 'workflow' ? 'workflowid' : 'connectionreferenceid';
+    return (await host.query(`${set}?$select=${key}&$filter=${key} eq ${id}`)).length > 0;
+}
+
+async function isMember(host: Host, solutionId: string, id: string): Promise<boolean> {
+    return (await host.query(`solutioncomponents?$select=objectid&$filter=_solutionid_value eq ${solutionId} and objectid eq ${id}`)).length > 0;
+}
+
+/** What a removed row says once the membership is gone, and what a deleted row says once it is gone. */
+export const REMOVED = 'Removed from the solution and read back.';
+export const DELETED = 'Deleted and read back.';
+
+/**
+ * One row of a remove or a delete (feature 016). The state is read again just before (the preview may be old) and read
+ * back after: a row is "done" only when the environment shows the result. It never throws.
+ */
+async function removalRow(host: Host, plan: Plan, row: Plan['rows'][number]): Promise<{ status: RowOutcome['status']; message: string }> {
+    const table = tableOf(plan, row);
+    try {
+        if (!GUID.test(row.id)) return { status: 'skipped', message: 'The row has no valid id; nothing was changed.' };
+        if (plan.kind === 'remove') {
+            const solution = plan.solution;
+            if (!solution || !GUID.test(solution.id) || row.componentType === undefined) return { status: 'skipped', message: 'The solution or the component type is not known; nothing was changed.' };
+            if (!(await isMember(host, solution.id, row.id))) return { status: 'skipped', message: 'It is not in the solution any more; nothing was changed. Refresh and preview again.' };
+            await host.removeFromSolution(solution.uniqueName, row.id, row.componentType);
+            if (await isMember(host, solution.id, row.id)) return { status: 'failed', message: 'The environment accepted the request but the row is still in the solution. Check it in the maker portal.' };
+            return { status: 'done', message: REMOVED };
+        }
+        if (!(await rowExists(host, table, row.id))) return { status: 'skipped', message: 'The row is already gone; nothing was changed. Refresh and preview again.' };
+        // Checked again now, not only when the plan was built: something may have started to depend on it since.
+        if (row.componentType === undefined) return { status: 'skipped', message: 'The component type is not known, so its dependencies cannot be checked; nothing was deleted.' };
+        let deps: readonly { id: string; type: number }[];
+        try {
+            deps = await host.dependencies(row.componentType, row.id);
+        } catch (e) {
+            return { status: 'skipped', message: `The dependencies could not be checked (${message(e)}); nothing was deleted.` };
+        }
+        const planned = new Set(writableRows(plan).map(r => r.id)); // a row that is blocked stays, so it still depends
+        const outside = deps.filter(d => !planned.has(d.id));
+        if (outside.length > 0) return { status: 'skipped', message: `${outside.length} other component${outside.length === 1 ? '' : 's'} depend${outside.length === 1 ? 's' : ''} on it; nothing was deleted.` };
+        if (table === 'workflow') {
+            const state = await readState(host, row.id);
+            if (state !== 0) return { status: 'skipped', message: 'The flow is not off (its state changed since the preview); it was not deleted.' };
+        }
+        await host.remove(table, row.id);
+        if (await rowExists(host, table, row.id)) return { status: 'failed', message: 'The environment accepted the request but the row still exists. Check it in the maker portal.' };
+        return { status: 'done', message: DELETED };
+    } catch (e) {
+        return { status: 'failed', message: message(e) };
+    }
 }
 
 function confirmed(kind: Plan['kind'], row: { newValue: string; oldValue: string; payload: string }, after: string | undefined): boolean {

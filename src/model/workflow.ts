@@ -2,7 +2,7 @@
 
 export type StepKey = 'choose' | 'preview' | 'apply' | 'result';
 export type WizardStep = Exclude<StepKey, 'choose'>;
-export type OperationKind = 'connection' | 'repoint';
+export type OperationKind = 'connection' | 'repoint' | 'remove' | 'delete';
 /** `leave` discards the plan and returns to the choices. */
 export type Move = WizardStep | 'leave';
 
@@ -40,7 +40,8 @@ export function crumbsFor(current: WizardStep): Crumb[] {
     }));
 }
 
-export const operationLabel = (kind: OperationKind): string => (kind === 'connection' ? 'Change connection' : 'Re-point flows');
+export const operationLabel = (kind: OperationKind): string =>
+    ({ connection: 'Change connection', repoint: 'Re-point flows', remove: 'Remove from this solution', delete: 'Delete' })[kind];
 
 export function stepTitle(step: WizardStep): string {
     return { preview: 'Preview what will be stored', apply: 'Processing your changes', result: 'Result' }[step];

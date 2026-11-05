@@ -6,6 +6,9 @@ export type { RepointGroup } from './repoint';
 
 /** Pure planners (constitution T2, T3, T4). Nothing here writes; the caller shows the plan and asks to confirm. */
 
+/** Why a flow that is on is not written until the tool may turn it off (the permission is asked in the confirmation). */
+export const TURNED_ON = 'The flow is turned on: turn it off first, or allow the tool to turn it off in the confirmation.';
+
 /** Only a flow that is off (draft) is rewritten: constitution T4 until active flows are verified. */
 export const REWRITABLE_STATE = 0;
 
@@ -92,7 +95,7 @@ export function planRepointGroups(snapshot: Snapshot, flowIds: readonly string[]
         let blocked: string | undefined;
         let payload = flow.clientData;
         if (snapshot.solution.managed || flow.managed) blocked = 'Managed: read-only.';
-        else if (flow.stateCode !== REWRITABLE_STATE && !(manageState && flow.stateCode === 1)) blocked = flow.stateCode === 1 ? 'The flow is turned on: turn it off first.' : 'The flow is not off (suspended): turn it off first.';
+        else if (flow.stateCode !== REWRITABLE_STATE && !(manageState && flow.stateCode === 1)) blocked = flow.stateCode === 1 ? TURNED_ON : 'The flow is not off (suspended): turn it off first.';
         else if (active.length === 0) blocked = 'No reference to replace was chosen.';
         else if (groupBlocked !== undefined) blocked = groupBlocked;
         else if (held.length === 0) blocked = active.some(g => g.chosen.includes(g.target) && view.uses.some(u => u.logicalName === g.target)) ? 'Already uses the new reference: nothing to change.' : 'The flow does not use any of the chosen references.';
@@ -142,6 +145,11 @@ export function planRepoint(snapshot: Snapshot, flowIds: readonly string[], from
 /** The rows whose flow will be turned off for the write and on again after it. */
 export function turnOffRows(plan: Plan): PlanRow[] {
     return plan.rows.filter(r => r.turnOff === true && r.blocked === undefined);
+}
+
+/** Rows blocked only because the flow is on: the permission to turn flows off would let them through. */
+export function unlockableRows(plan: Plan): PlanRow[] {
+    return plan.rows.filter(r => r.blocked === TURNED_ON);
 }
 
 /** Why rows are blocked, grouped: each reason with the number of rows it blocks, most frequent first. */

@@ -2,7 +2,6 @@
    Rule (constitution VII): reuse the kit's classes and tokens; no colours, no hex, no new token here. */
 @import './ui/ui.css';
 
-.log-panel { flex: 0 0 auto; }
 .muted { color: var(--color-text-muted); }
 .flag { color: var(--color-warning); }
 .data-table td { overflow-wrap: anywhere; vertical-align: middle; }
@@ -79,8 +78,6 @@
 .studio-pane-body { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); overflow: auto; min-height: 0; flex: 1 1 auto; }
 .studio-group { display: flex; flex-direction: column; gap: var(--sp-2); padding-bottom: var(--sp-2); }
 .studio-group.is-off { opacity: 0.55; }
-.studio-group-head { display: flex; align-items: center; gap: var(--sp-2); }
-.studio-group-title { flex: 1; min-width: 0; font-weight: 600; color: var(--color-text-strong); overflow-wrap: anywhere; }
 .studio-note { display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; color: var(--color-text-muted); font-size: var(--fs-sm); }
 .studio-note--warn { color: var(--color-warning); }
 .studio-impact { flex: none; }
@@ -107,9 +104,6 @@
 .studio-group--success { border-left-color: var(--color-success); }
 .studio-group--warning { border-left-color: var(--color-warning); }
 .studio-group.is-on { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg)); }
-.studio-group-head { flex-wrap: wrap; }
-.studio-group-reach { display: flex; align-items: center; gap: var(--sp-3); }
-.studio-pane-tools { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: flex-end; }
 .meter { flex: 1 1 80px; min-width: 60px; height: 6px; border-radius: 999px; background: var(--color-surface-2); overflow: hidden; }
 .meter-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--color-primary), var(--color-info)); }
 .studio-group--success .meter-fill { background: var(--color-success); }
@@ -131,34 +125,11 @@
 .confirm-dialog.is-expanded { width: 100%; }
 
 /* Table of fields in the preview: a readable name, the path small underneath, the values in one clear column each. */
-.fields-table :is(th, td):nth-child(1) { width: 38%; }
-.fields-table :is(th, td):nth-child(2), .fields-table :is(th, td):nth-child(3) { width: 26%; }
-.fields-table :is(th, td):nth-child(4) { width: 10%; }
-.what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.what-title { font-weight: 600; color: var(--color-text-strong); overflow-wrap: anywhere; }
-.what-path { font-family: var(--font-mono, monospace); font-size: var(--fs-xs); color: var(--color-text-muted); overflow-wrap: anywhere; }
 .value { overflow-wrap: anywhere; }
 
 /* The run: it must be obvious that something is going on. */
-.run-hero { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-5) var(--sp-6); border: 1px solid color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); border-radius: var(--radius-lg); background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)), var(--color-surface)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 12%, transparent), 0 10px 30px color-mix(in srgb, var(--color-primary) 14%, transparent); }
-.run-top { display: flex; align-items: center; gap: var(--sp-4); }
 .run-spinner { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--color-primary) 22%, transparent); border-top-color: var(--color-primary); border-right-color: var(--color-info); animation: run-spin 0.9s linear infinite; }
-.run-titles { flex: 1; min-width: 0; }
-.run-headline { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--color-text-strong); }
-.run-sub { margin: 2px 0 0; color: var(--color-text-muted); font-size: var(--fs-sm); }
-.run-percent { flex: none; min-width: 4ch; text-align: right; font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-primary); }
-.run-bar { height: 12px; border-radius: 999px; background: var(--color-surface-2); overflow: hidden; border: 1px solid var(--color-border); }
-.run-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--color-primary), var(--color-info)); transition: width 0.4s ease; }
-.run-fill.is-moving { background-size: 200% 100%; background-image: linear-gradient(90deg, var(--color-primary), var(--color-info), var(--color-primary)); animation: run-shimmer 1.6s linear infinite; }
-.run-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); font-size: var(--fs-sm); }
-.run-now { flex: 1 1 auto; color: var(--color-text); font-weight: 600; }
-.run-count { padding: 2px var(--sp-2); border-radius: 999px; border: 1px solid var(--color-border); font-variant-numeric: tabular-nums; }
-.run-count--done { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
-.run-count--skipped { color: var(--color-warning); border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border)); }
-.run-count--failed { color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 45%, var(--color-border)); }
 @keyframes run-spin { to { transform: rotate(360deg); } }
-@keyframes run-shimmer { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .run-spinner, .run-fill.is-moving { animation: none; } }
 
 
 /* The steps breathe: every block of a step is separated from the next one. */
@@ -199,7 +170,6 @@
 .studio-panel-titles { display: flex; flex-direction: column; flex: 1 1 200px; min-width: 0; }
 .studio-panel-title { margin: 0; font-size: var(--fs-lg); font-weight: 600; color: var(--color-text-strong); }
 .studio-panel-sub { font-size: var(--fs-sm); color: var(--color-text-muted); }
-.studio-panel .studio-group-reach { flex: 0 1 240px; }
 .studio-panel .studio { flex: 1 0 auto; min-height: 260px; }
 .studio-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--sp-4); flex: none; }
 .studio-nav-mid { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
@@ -232,3 +202,156 @@
 .studio-bottom { grid-template-columns: 1fr; }
 .studio-bottom .studio-impact .fig-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 900px) { .studio-bottom .studio-impact .fig-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Remove from this solution and Delete (feature 016) */
+.action-strip { grid-template-columns: minmax(0, 1fr) auto auto; }
+.action-strip .action-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.removal-from { color: var(--color-text-muted); }
+.removal-to { font-weight: 600; }
+.removal-to--delete { color: var(--color-error); }
+
+/* The studio keeps its figures and buttons in view: only the two lists scroll, inside a fixed height */
+.studio-dialog .modal-body { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.studio-dialog .studio-panel { flex: 1 1 0; min-height: 0; }
+.studio-dialog .studio, .studio-dialog .studio-panel .studio { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+.studio-dialog .studio-top, .studio-dialog .studio-bottom, .studio-dialog .studio-state { flex: none; }
+@media (max-width: 760px) {
+    .studio-dialog .modal-body { overflow: auto; }
+    .studio-dialog .studio, .studio-dialog .studio-panel .studio { flex: 1 0 auto; min-height: 300px; grid-template-rows: none; }
+    .studio-dialog .studio-panel { flex: 1 0 auto; }
+}
+
+/* Delete in the action bar: a solid red of the error token (the shared kit's danger button is only red text) */
+.action-strip .btn--danger:not(:disabled) { background: var(--color-error); border-color: var(--color-error); color: var(--color-bg); font-weight: 600; }
+.action-strip .btn--danger:not(:disabled):hover { filter: brightness(1.12); }
+.action-strip .btn--danger:disabled { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-muted); opacity: 0.7; }
+
+/* the studio bar holds only where you are: the pipeline moves between categories */
+.studio-nav { grid-template-columns: minmax(0, 1fr); }
+
+/* The two tabs of the Preview (feature 017) */
+.preview-tabs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-3); }
+
+/* The log dock: always at the bottom of the window, open or closed */
+#log-dock { flex: none; }
+.log-dock { border-top: 1px solid var(--color-border); background: var(--color-surface); }
+.log-dock-bar { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-1) var(--sp-4); }
+.log-dock-toggle { display: flex; flex: 1 1 auto; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-2) 0; border: 0; background: none; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
+.log-dock-toggle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.log-dock-title { font-weight: 600; color: var(--color-text-strong); }
+.log-dock-last { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; margin-left: var(--sp-2); font: var(--fs-xs)/1.4 ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--color-text-muted); }
+.log-dock-last.log-entry--warning { color: var(--color-warning); }
+.log-dock-last.log-entry--error { color: var(--color-error); }
+.log-dock-time { margin-right: var(--sp-2); }
+.log-dock-caret { margin-left: auto; transform: rotate(180deg); transition: transform 0.15s ease; }
+.log-dock.is-open .log-dock-caret { transform: none; }
+.log-dock-actions { display: flex; flex: none; gap: var(--sp-2); }
+.log-dock-list { height: 200px; max-height: 40vh; overflow: auto; padding: var(--sp-2) var(--sp-4) var(--sp-3); border-top: 1px solid var(--color-border); background: var(--color-bg); font: var(--fs-xs)/1.5 ui-monospace, 'Cascadia Mono', Consolas, monospace; resize: vertical; }
+.log-dock-list .log-entry { display: flex; align-items: baseline; gap: var(--sp-2); padding: 1px 0; }
+.log-dock-list .log-entry .icon { align-self: center; }
+.log-dock-list .log-message { min-width: 0; overflow-wrap: anywhere; }
+.log-dock-empty { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .log-dock-caret { transition: none; } }
+
+/* The run: every row from the start, greyed, then coloured as it is processed (more per line on a wide window) */
+.run-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+.run-item { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--color-border); border-left: 4px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); transition: background 0.2s, border-color 0.2s, opacity 0.2s; }
+.run-item-mark { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; flex: none; color: var(--color-text-muted); }
+.run-item-text { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+.run-item-name { font-weight: 600; color: var(--color-text-strong); overflow-wrap: anywhere; }
+.run-item-msg { font-size: var(--fs-sm); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.run-item--pending { opacity: 0.55; }
+.run-item--working { border-color: var(--color-primary); border-left-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+.run-item--done { border-left-color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface)); }
+.run-item--done .run-item-mark { color: var(--color-success); }
+.run-item--skipped { border-left-color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface)); }
+.run-item--skipped .run-item-mark { color: var(--color-warning); }
+.run-item--failed { border-left-color: var(--color-error); background: color-mix(in srgb, var(--color-error) 8%, var(--color-surface)); }
+.run-item--failed .run-item-mark { color: var(--color-error); }
+.run-spinner--sm { width: 16px; height: 16px; border-width: 2px; }
+@media (prefers-reduced-motion: reduce) { .run-item { transition: none; } }
+
+/* The tabs of the Preview and the layout of the diff share one line */
+.preview-tabs .layout-bar { margin: 0; }
+.preview-summary { flex: 1 1 auto; color: var(--color-text-muted); font-size: var(--fs-sm); }
+
+/* Delete: a solid red wherever it is the main button of a bar */
+.step-footer .btn--danger:not(:disabled) { background: var(--color-error); border-color: var(--color-error); color: var(--color-bg); font-weight: 600; }
+.step-footer .btn--danger:not(:disabled):hover { filter: brightness(1.12); }
+
+/* The confirmation keeps its buttons at the bottom whatever the height of the dialog */
+.confirm-dialog .modal-body { flex: 1 1 auto; }
+
+/* Switches say ON or OFF (the kit's bare knob is hard to read) */
+.toggle { width: 56px; height: 24px; }
+.toggle::before { content: 'OFF'; position: absolute; inset: 0 9px 0 auto; display: flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.toggle::after { top: 2px; left: 2px; width: 18px; height: 18px; }
+.toggle.is-on::before { content: 'ON'; inset: 0 auto 0 9px; color: var(--color-on-primary); }
+.toggle.is-on::after { transform: translateX(32px); }
+
+/* The dialog of Remove from solution and Delete (feature 019) */
+.removal-dialog { width: min(920px, 100%); }
+.removal-lead { display: flex; align-items: center; gap: var(--sp-3); margin: 0; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); color: var(--color-text-strong); }
+.removal-lead--delete { border-left-color: var(--color-error); background: color-mix(in srgb, var(--color-error) 10%, var(--color-surface)); }
+.removal-lead--delete .icon { color: var(--color-error); }
+.removal-gate { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); border: 1px dashed var(--color-error); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface)); }
+.removal-gate.is-open { border-style: solid; border-color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface)); }
+.removal-gate-head { display: flex; align-items: center; gap: var(--sp-2); color: var(--color-text-strong); }
+.removal-gate.is-open .removal-gate-head .icon { color: var(--color-success); }
+.removal-gate-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.removal-code { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); color: var(--color-text-strong); font: 600 var(--fs-md)/1.2 ui-monospace, 'Cascadia Mono', Consolas, monospace; letter-spacing: 0.08em; user-select: all; }
+.removal-input { flex: 1 1 220px; min-width: 0; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.removal-gate-hint { margin: 0; font-size: var(--fs-sm); color: var(--color-text-muted); }
+
+
+/* The top of every page stays where it is; only the list or the body scrolls; the buttons stay at the bottom (feature 020) */
+.main-content { overflow: hidden; padding-bottom: 0; }
+#content { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.screen { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.screen > .hero, .screen > .toolbar { flex: none; }
+.screen > .table-wrap { flex: 1 1 auto; min-height: 0; max-height: none; }
+/* a solution: the panel keeps its header, toolbar and bar; the table takes the rest */
+.panel.screen { margin-bottom: 0; }
+.panel.screen > .panel-head { flex: none; }
+.panel.screen > .panel-body { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.panel.screen > .panel-body > * { flex: none; }
+.panel.screen > .panel-body > .table-wrap { flex: 1 1 auto; min-height: 0; max-height: none; }
+.panel.screen > .panel-body > .empty-state { flex: 1 1 auto; }
+/* a step: head fixed, body scrolls, footer fixed */
+.step-panel { flex: 1 1 auto; min-height: 0; gap: 0; }
+.step-panel > .step-header-row { flex: none; margin-bottom: var(--sp-3); }
+.step-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--sp-4); min-height: 0; overflow: auto; padding-bottom: var(--sp-3); }
+.step-body > * { flex: none; }
+.step-panel > .step-footer { flex: none; margin: 0; padding: var(--sp-3) 0; border-top: 1px solid var(--color-border); background: var(--color-bg); }
+
+/* The run: one panel (feature 021): a ring and three counters, the phases, then every row */
+.run-panel { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.run-hero { display: grid; grid-template-columns: auto minmax(200px, max-content) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5); padding: var(--sp-4) var(--sp-5); background: linear-gradient(120deg, color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)), var(--color-surface) 70%); }
+.run-ring { --p: 0; position: relative; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; background: conic-gradient(var(--color-primary) calc(var(--p) * 1%), var(--color-surface-2) 0); transition: background 0.3s; }
+.run-ring::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: var(--color-surface); }
+.run-ring.is-moving { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 14%, transparent); animation: run-pulse 2s ease-in-out infinite; }
+.run-ring.is-done { background: conic-gradient(var(--color-success) 100%, var(--color-surface-2) 0); }
+.run-percent { position: relative; font-size: var(--fs-lg); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-text-strong); }
+.run-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.run-headline-row { display: flex; align-items: center; gap: var(--sp-2); }
+.run-headline { margin: 0; font-size: var(--fs-lg); font-weight: 600; color: var(--color-text-strong); }
+.run-hero .run-spinner { width: 18px; height: 18px; border-width: 3px; }
+.run-now { margin: 0; font-weight: 600; color: var(--color-text); }
+.run-sub { margin: 0; font-size: var(--fs-sm); color: var(--color-text-muted); }
+.run-counters { display: flex; gap: var(--sp-3); }
+.run-count { display: flex; min-width: 84px; flex-direction: column; align-items: center; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); font-size: var(--fs-sm); color: var(--color-text-muted); }
+.run-count b { font-size: var(--fs-xl); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.run-count--done b { color: var(--color-success); }
+.run-count--skipped b { color: var(--color-warning); }
+.run-count--failed b { color: var(--color-error); }
+.run-phases { min-width: 0; }
+.run-rows { padding: var(--sp-3) var(--sp-5) var(--sp-4); border-top: 1px solid var(--color-border); background: var(--color-bg); }
+.run-rows-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); color: var(--color-text-strong); font-weight: 600; }
+@keyframes run-pulse { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-primary) 6%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .run-ring.is-moving { animation: none; } }
+@media (max-width: 1100px) { .run-hero { grid-template-columns: auto minmax(0, 1fr); } .run-phases, .run-counters { grid-column: 1 / -1; } }
+@media (prefers-reduced-motion: reduce) { .run-spinner { animation: none; } }
+
+/* A table that is the main content of a step (the Result) takes the room left and scrolls by itself: the page does not */
+.step-body > .detail-block { display: flex; flex: 1 1 0; flex-direction: column; min-height: 200px; }
+.step-body > .detail-block > .table-wrap { flex: 1 1 auto; min-height: 0; max-height: none; overflow: auto; }

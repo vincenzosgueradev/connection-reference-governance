@@ -5,7 +5,7 @@ import { connectorInfo } from '../model/connectors';
 import { connectionImpact, groupsImpact, usageShare } from '../model/impact';
 import { planRepointGroups, writableRows } from '../model/plans';
 import { categoriesOf, repointTargets, stepStatus, type RepointSource, type StepStatus } from '../model/repoint';
-import { button, check, chip, el, figures, icon, modal, toggle } from '../ui/components';
+import { button, check, chip, el, figures, icon, modal } from '../ui/components';
 import { connectorTile } from './connections';
 import { makeExpandable } from './expand';
 import type { Handlers } from './main';
@@ -84,24 +84,6 @@ function choice(label: string, selected: boolean, disabled: boolean, onPick: () 
 
 const ownerOf = (r: ConnectionReferenceRow) => (r.ownerName === '' ? 'Owner unknown' : r.ownerName);
 
-/**
- * The permission to turn flows that are on off for the change and on again afterwards (feature 011). The block is always
- * there with the same shape; it is closed when no selected flow is on, and off by default.
- */
-function statePermission(s: State, store: Store, snap: Snapshot): HTMLElement {
-    const on = snap.flows.filter(f => s.selected.includes(f.flow.id) && f.flow.stateCode === 1).length;
-    const root = el('section', on > 0 && s.manageState ? 'studio-state is-on' : 'studio-state');
-    const text = el('div', 'studio-state-text');
-    text.append(
-        el('strong', 'studio-state-title', 'Turn these flows off for the change and on again afterwards'),
-        el('span', 'studio-state-hint', on === 0 ? 'No selected flow is turned on, so there is nothing to turn off.' : `${on} selected flow${on === 1 ? ' is' : 's are'} turned on: without this they stay blocked. You will see everything it means before you confirm.`),
-    );
-    const sw = toggle(on > 0 && s.manageState, 'Turn the flows that are on off and on again', () => store.dispatch({ type: 'setManageState', on: !s.manageState }));
-    sw.disabled = on === 0;
-    root.append(icon('power', 'studio-state-icon'), text, sw);
-    return root;
-}
-
 /** The step last drawn: the motion plays only when it changes (a redraw caused by a choice must not replay it). */
 let lastStep = -1;
 export function resetStudioMotion(): void {
@@ -144,12 +126,7 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
         pipe.append(entry(i, connectorInfo(c.connectorId).name, st === 'empty' && i >= step ? 'pending' : st, connectorInfo(c.connectorId).glyph, connectorTile(c.connectorId, false, true)));
     });
     pipe.append(entry(last, 'Summary', 'pending', 'clipboard-check'));
-    const everything = button('Select every category', 'secondary', () => store.dispatch({ type: 'setGroups', groups: cats.map(c => ({ connectorId: c.connectorId, from: c.sources.map(x => x.logicalName), target: stateOf(c.connectorId)?.target ?? '' })) }), true);
-    const none = button('Clear all', 'secondary', () => store.dispatch({ type: 'setGroups', groups: [] }), true);
-    none.disabled = groupsState.length === 0;
-    const tools = el('div', 'studio-pane-tools');
-    tools.append(everything, none);
-    top.append(pipe, tools);
+    top.append(pipe);
 
     // the current step
     const panel = el('section', 'studio-panel');
@@ -179,7 +156,7 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
         }
 
         const right = pane('to', 'Reference to use instead', 'Only references of this connector in this solution.');
-        if (chosen.length === 0) right.body.append(note('Tick the references to replace first, or press Next to leave this category as it is.'));
+        if (chosen.length === 0) right.body.append(note('Tick the references to replace first, or go to another category to leave this one as it is.'));
         else {
             const targets = repointTargets(snap, chosen);
             if (targets.length === 0) right.body.append(note('There is no other reference of this connector in this solution, so there is nothing to re-point to.', true));
@@ -215,20 +192,14 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
         panel.append(head, list);
     }
 
-    // back and next, with where you are and why Next is closed (the note is always there, so nothing moves)
+    // where you are and what is left to do; moving between categories is done with the pipeline above, so there are no
+    // Back and Next buttons repeating it (the note is always there, so nothing moves)
     const nav = el('div', 'studio-nav');
-    const backBtn = button('Back', 'secondary', () => go(step - 1));
-    backBtn.prepend(icon('arrow-left'));
-    backBtn.disabled = step === 0;
-    const nextBtn = button('Next', 'primary', () => go(step + 1));
-    nextBtn.append(icon('arrow-right'));
-    nextBtn.disabled = incompleteHere || step >= last;
-    if (step >= last) nextBtn.classList.add('is-idle');
     const mid = el('div', 'studio-nav-mid');
     mid.append(el('span', 'studio-where', step < last ? `Category ${step + 1} of ${last}` : 'Summary'));
-    const reason = el('span', incompleteHere ? 'studio-nav-note' : 'studio-nav-note is-idle', incompleteHere ? 'Choose the reference to use instead to go on, or untick the references to leave this category as it is.' : ' ');
+    const reason = el('span', incompleteHere ? 'studio-nav-note' : 'studio-nav-note is-idle', incompleteHere ? 'Choose the reference to use instead, or untick the references to leave this category as it is.' : ' ');
     mid.append(reason);
-    nav.append(backBtn, mid, nextBtn);
+    nav.append(mid);
 
     const i = groupsImpact(snap, s.selected, groupsState);
     const impact = figures([
@@ -239,14 +210,11 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
     ]);
     // Offer only what the planner accepts: with every choice made, something must be writable.
     const complete = groupsState.length > 0 && missing.length === 0;
-    const plan = complete ? planRepointGroups(snap, s.selected, groupsState, '', s.manageState) : null;
+    const plan = complete ? planRepointGroups(snap, s.selected, groupsState, '', true) : null;
     const nothing = plan !== null && writableRows(plan).length === 0;
-    const onBlocked = plan === null ? 0 : plan.rows.filter(r => r.blocked !== undefined && r.blocked.includes('turned on')).length;
-    const notice = !nothing ? ''
-        : onBlocked > 0 && !s.manageState ? `${onBlocked} flow${onBlocked === 1 ? '' : 's'} that use${onBlocked === 1 ? 's' : ''} these references ${onBlocked === 1 ? 'is' : 'are'} turned on: allow the tool to turn them off (the switch above), or turn them off yourself.`
-            : 'No selected flow can be written with these choices.';
-    // the permission is asked once, on the summary, not at every connector
-    return { main: [top, panel, ...(step >= last ? [statePermission(s, store, snap)] : [])], foot: nav, impact, ready: complete && !nothing, missing, notice };
+    // a flow that is on is not a reason to keep Review changes closed: the permission to turn it off is asked in the confirmation
+    const notice = !nothing ? '' : 'No selected flow can be written with these choices.';
+    return { main: [top, panel], foot: nav, impact, ready: complete && !nothing, missing, notice };
 }
 
 function connectionParts(s: State, store: Store, snap: Snapshot): Parts {

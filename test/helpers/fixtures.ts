@@ -84,6 +84,9 @@ export function fakeHost(answer: (q: string) => Record_[], failUpdate: (id: stri
             if (err) throw new Error(err);
             h.updates.push({ entity, id, record });
         },
+        async remove() {},
+        async dependencies() { return []; },
+        async removeFromSolution() {},
         async currentUserId() {
             return USER;
         },
@@ -133,6 +136,9 @@ export function memoryHost(initial: Record<string, Record<string, string>>, opts
             h.updates.push({ entity, id, record });
             if (opts.persist !== false) rows.set(id, { ...rows.get(id), ...(opts.store ? opts.store(record as Record<string, string>) : (record as Record<string, string>)) });
         },
+        async remove() {},
+        async dependencies() { return []; },
+        async removeFromSolution() {},
         async currentUserId() {
             return USER;
         },

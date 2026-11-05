@@ -80,3 +80,7 @@ Every requirement above is covered by tests; mutation checks guard the rules tha
 - test/confirm.test.ts
 - test/studio.test.ts
 - test/result.test.ts
+
+## Amendment 2026-11-05 (hand look: where the permission lives)
+
+The permission to turn flows that are on off and on again is asked **only in the confirmation dialog**, and only when a flow of the plan is on. It used to be a block on the Summary step of the studio, which a user who pressed Review changes from a category never saw, leaving the flows blocked with no way to allow them. Now: the studio does not stop at flows that are on; the Preview shows them as blocked ("turn it off first, or allow the tool to turn it off in the confirmation") and keeps Apply open to reach the dialog; turning the permission on there reads the plan again (rows that were blocked only for being on are written and marked), clears what was ticked, and keeps the dialog open. Apply stays closed when nothing could be written even with the permission (managed, suspended).

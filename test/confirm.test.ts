@@ -21,13 +21,14 @@ const flows = () => [
 /** The user path to the confirmation: Review, Preview, then Apply... opens the dialog. */
 function openConfirm(store: ReturnType<typeof createStore>, plan: ReturnType<typeof planConnectionChange>): void {
     store.dispatch({ type: 'openPlan', plan });
+    store.dispatch({ type: 'setTab', tab: 'table' }); // the before-and-after lines live in the Table tab of the Preview (feature 017)
     store.dispatch({ type: 'openConfirm' });
 }
 
 function screen() {
     const sol = solution();
     const store = createStore(initialState());
-    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
+    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
     const root = document.createElement('div');
     document.body.innerHTML = '';
     document.body.append(root);

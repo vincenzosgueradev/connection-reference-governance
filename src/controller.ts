@@ -2,13 +2,23 @@ import type { Host } from './host';
 import { buildSnapshot } from './model/analysis';
 import { backupFileName, buildBackup } from './model/backup';
 import { planConnectionChange, planRepointGroups } from './model/plans';
+import { planRemoval } from './model/removal';
 import { buildReport, reportFileName } from './model/report';
 import { operationLabel } from './model/workflow';
-import { applyPlan, loadFlowCounts, loadSnapshotInput, loadSolutions } from './services/dataverse';
+import { applyPlan, loadFlowCounts, loadSnapshotInput, loadSolutions, readDependencies } from './services/dataverse';
 import { log } from './services/log';
 import type { Store } from './state/store';
 import type { RowOutcome } from './types';
 import type { Handlers } from './views/main';
+
+/** A short code to copy and paste, without the characters that are easy to mistake for each other. */
+function defaultCode(): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const bytes = new Uint8Array(6);
+    if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+    else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    return `DELETE-${[...bytes].map(b => alphabet[b % alphabet.length]).join('')}`;
+}
 
 /** Wires user intent to services and dispatches the outcome. No markup, no rules of its own. */
 export function createController(
@@ -16,6 +26,7 @@ export function createController(
     store: Store,
     clock: () => number = () => Date.now(),
     tickMs = 1000,
+    makeCode: () => string = defaultCode,
 ): Handlers & { start(): Promise<void>; environment(): string; idle(): Promise<void> } {
     let environment = '';
     let userId = '';
@@ -100,6 +111,35 @@ export function createController(
             const s = store.get();
             if (!s.snapshot) return;
             store.dispatch({ type: 'openPlan', plan: planRepointGroups(s.snapshot, s.selected, s.repointGroups, userId, s.manageState) });
+        },
+        setManageState(on) {
+            store.dispatch({ type: 'setManageState', on });
+            const s = store.get();
+            if (s.snapshot && s.plan && s.plan.kind === 'repoint' && s.wizard?.step === 'preview')
+                store.dispatch({ type: 'replacePlan', plan: planRepointGroups(s.snapshot, s.selected, s.repointGroups, userId, on) });
+        },
+        // Taking things away has no step to choose in: the dialog opens at once, over the list (feature 019).
+        previewRemove() {
+            const s = store.get();
+            if (!s.snapshot) return;
+            store.dispatch({ type: 'openPlan', plan: planRemoval(s.snapshot, s.selected, 'remove') });
+            store.dispatch({ type: 'openConfirm' });
+        },
+        async previewDelete() {
+            const s = store.get();
+            if (!s.snapshot) return;
+            const chosen = s.selected;
+            const snapshot = s.snapshot;
+            store.dispatch({ type: 'busy', busy: true });
+            // what depends on each row is asked first: a row something depends on is never offered for deletion
+            const deps = await readDependencies(host, snapshot, chosen);
+            store.dispatch({ type: 'busy', busy: false });
+            if (store.get().snapshot !== snapshot) return; // the user moved on while it was read
+            store.dispatch({ type: 'openPlan', plan: planRemoval(snapshot, chosen, 'delete', deps), code: makeCode() });
+            store.dispatch({ type: 'openConfirm' });
+        },
+        setTypedCode(value) {
+            store.dispatch({ type: 'setTypedCode', value });
         },
         async saveBackup() {
             const plan = store.get().plan;

@@ -34,7 +34,7 @@ Order of dependence: 001 and 002 read; 003 and 004 plan changes; 005 confirms an
 
 - **FR-013**: Tests and fixtures MUST contain no tenant data.
 - **FR-014**: The README MUST state what is read, what is written, that an environment is touched, and carry the credits section required by the constitution.
-- **FR-301**: The tool MUST NOT create or delete anything, nor change anything other than the connection id of existing references and the reference name inside the definition of existing flows.
+- **FR-301**: The tool MUST NOT create anything, and MUST NOT delete or remove anything except through the confirmed operations of [feature 016](../016-remove-and-delete/spec.md); it MUST NOT change anything other than the connection id of existing references and the reference name inside the definition of existing flows.
 
 ## Product success criteria
 

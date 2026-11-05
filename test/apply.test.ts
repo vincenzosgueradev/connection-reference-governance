@@ -32,7 +32,7 @@ async function toApplying(extra: Parameters<typeof app>[0] = {}) {
     await settle();
     return { ...a, ...g };
 }
-const rows = (root: ParentNode) => qa(root, '.detail-block').find(b => q(b, '.detail-title')!.textContent === 'Rows')!;
+const rows = (root: ParentNode) => q(root, '.run-rows')!;
 const status = (root: ParentNode) => q(root, '.pipe-status')!.textContent;
 const phases = (root: ParentNode) => qa(root, '.pipe-step').map(s => `${q(s, '.pipe-label')!.textContent}:${s.className.replace('pipe-step ', '')}`);
 
@@ -54,16 +54,21 @@ describe('the Apply step while rows are being written', () => {
         await settle(40);
         expect(status(a.root)).toBe('Writing and verifying: 0 of 3 rows · 1 min 05 s');
     });
-    it('each row appears in the live table as soon as it is finished, with its outcome and message', async () => {
+    const items = (root: ParentNode) => qa(rows(root), '.run-item');
+    const states = (root: ParentNode) => items(root).map(r => r.className.replace('run-item run-item--', ''));
+    it('every row is there from the start, waiting; the one being written is marked; each takes its outcome as soon as it is finished', async () => {
         const a = await toApplying();
-        expect(q(rows(a.root), '.live-empty')!.textContent).toBe('No row has finished yet.');
+        expect(items(a.root).map(r => q(r, '.run-item-name')!.textContent)).toEqual(['Alpha flow', 'Beta flow', 'Gamma flow']);
+        expect(states(a.root)).toEqual(['working', 'pending', 'pending']);
+        expect(q(items(a.root)[1]!, '.run-item-msg')!.textContent).toBe('Waiting');
         await a.release(guid(10));
-        expect(qa(rows(a.root), 'tbody tr')).toHaveLength(1);
-        expect(qa(rows(a.root), 'tbody tr td').map(c => c.textContent)).toEqual(['Alpha flow', 'done', 'Written and read back.']);
+        expect(states(a.root)).toEqual(['done', 'working', 'pending']);
+        expect(q(items(a.root)[0]!, '.run-item-msg')!.textContent).toBe('Written and read back.');
+        expect(q(items(a.root)[0]!, '.chip')!.textContent).toBe('done');
         expect(status(a.root)).toContain('1 of 3 rows');
-        expect(q(rows(a.root), '.detail-head .chip')!.textContent).toBe('1');
+        expect(q(rows(a.root), '.run-rows-head .chip')!.textContent).toBe('1 of 3');
         await a.release(guid(11));
-        expect(qa(rows(a.root), 'tbody tr')).toHaveLength(2);
+        expect(states(a.root)).toEqual(['done', 'done', 'working']);
         expect(status(a.root)).toContain('2 of 3 rows');
     });
     it('writes the rows one after the other, never two at once', async () => {
@@ -77,7 +82,7 @@ describe('the Apply step while rows are being written', () => {
         expect(buttonByText(a.root, 'Back')!.disabled).toBe(true);
         expect(buttonByText(a.root, 'Back')!.title).toContain('no way back');
         expect(qa(a.crumbs, '.crumb--link')).toHaveLength(0);
-        expect(qa(a.crumbs, '.crumb').map(c => c.textContent)).toEqual(['Solutions', 'Sample', 'Preview', 'Apply']);
+        expect(qa(a.crumbs, '.crumb').map(c => c.textContent)).toEqual(['Solutions', 'Sample', 'Apply']);
         a.controller.selectSolution('');
         a.store.dispatch({ type: 'closePlan' });
         a.store.dispatch({ type: 'dismissResults' });
@@ -86,13 +91,13 @@ describe('the Apply step while rows are being written', () => {
         expect(a.store.get().solutionId).toBe(a.sol.id);
     });
     it('a failed row does not stop the others, and shows its message', async () => {
+        const items = (root: ParentNode) => qa(rows(root), '.run-item');
+        const states = (root: ParentNode) => items(root).map(r => r.className.replace('run-item run-item--', ''));
         const a = await toApplying({ failUpdate: id => (id === guid(11) ? 'No privilege' : undefined) });
         await a.release(guid(10));
         await a.release(guid(11));
-        expect(qa(rows(a.root), 'tbody tr').map(r => qa(r, 'td').map(c => c.textContent))).toEqual([
-            ['Alpha flow', 'done', 'Written and read back.'],
-            ['Beta flow', 'failed', 'No privilege'],
-        ]);
+        expect(states(a.root)).toEqual(['done', 'failed', 'working']);
+        expect(q(items(a.root)[1]!, '.run-item-msg')!.textContent).toBe('No privilege');
         await a.release(guid(12));
         expect(a.calls.updates.map(u => u.id)).toEqual([guid(10), guid(12)]);
     });

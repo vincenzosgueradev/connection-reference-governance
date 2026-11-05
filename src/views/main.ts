@@ -13,6 +13,7 @@ import { confirmModal } from './confirm';
 import { resetStudioMotion, studioDialog } from './studio';
 import { previewStep } from './preview';
 import { resultStep } from './result';
+import { removalModal } from './removal';
 import { flowDetail, referenceDetail, stateChip, typeChip } from './detail';
 
 /** DOM only, built with the shared UI kit. Decisions are in model/ and services/; user intent goes out through `Handlers`. */
@@ -22,6 +23,12 @@ export interface Handlers {
     refresh(): void;
     previewConnection(): void;
     previewRepoint(): void;
+    /** Allows or forbids turning flows that are on off for the change; the open preview is read again with it. */
+    setManageState(on: boolean): void;
+    previewRemove(): void;
+    previewDelete(): void | Promise<void>;
+    /** What was pasted to unlock Delete. */
+    setTypedCode(value: string): void;
     confirm(): void;
     saveBackup(): void;
     saveReport(): void;
@@ -40,7 +47,7 @@ function nameWithIcon(name: string): HTMLElement {
 const SORT_COLUMNS: readonly SolutionSortKey[] = ['name', 'flows', 'created'];
 
 function solutionList(s: State, store: Store, h: Handlers): HTMLElement {
-    const root = el('div');
+    const root = el('div', 'screen');
     const unmanaged = s.solutions.filter(sol => !sol.managed);
     const managed = s.solutions.length - unmanaged.length;
     root.append(hero(
@@ -173,7 +180,7 @@ function referencesTable(s: State, store: Store): { table: HTMLElement; count: n
 }
 
 /** The slim bar over the table: what is selected and one button that opens the studio. It never changes shape. */
-function actionStrip(s: State, store: Store): HTMLElement {
+function actionStrip(s: State, store: Store, h: Handlers): HTMLElement {
     const snap = s.snapshot!;
     const editable = !snap.solution.managed;
     const refs = s.view === 'references';
@@ -183,50 +190,73 @@ function actionStrip(s: State, store: Store): HTMLElement {
     const head = el('div', 'action-strip-text');
     const title = el('h3', 'action-title');
     title.append(icon(refs ? 'link' : 'git-branch'), refs ? 'Change the connection of references' : 'Re-point flows to another reference');
+    // A reference a flow of this solution still uses can be neither removed nor deleted: say so instead of offering it.
+    const picked = refs ? snap.references.filter(r => s.selected.includes(r.reference.id)) : [];
+    const inUse = picked.filter(r => r.flowIds.length > 0).length;
+    const allInUse = picked.length > 0 && inUse === picked.length;
     const hint = !editable ? 'This solution is managed: it can be read but not changed.'
+        : allInUse ? `${picked.length === 1 ? 'This reference is' : 'These references are'} used by flows, so ${picked.length === 1 ? 'it' : 'they'} cannot be removed or deleted. Re-point those flows to another reference first (Flows view, Choose changes), or change the connection here.`
         : chosen === 0 ? (refs ? 'Select connection references in the table to change their connection.' : 'Select flows in the table to re-point them to another reference.')
-            : 'Choose what to change in the studio. Nothing is written until you confirm.';
+            : refs ? 'Choose what to change in the studio, or remove or delete the selected references. Nothing is written until you confirm.' : 'Choose what to change in the studio. Nothing is written until you confirm.';
     head.append(title, el('p', 'action-hint', hint));
     const count = el('span', 'action-count', refs ? `${chosen} selected, ${flows} flows affected` : `${chosen} selected`);
     count.setAttribute('aria-live', 'polite');
     const open = button('Choose changes...', 'primary', () => store.dispatch({ type: 'openStudio' }));
     open.prepend(icon('sliders'));
     open.disabled = !editable || chosen === 0 || s.busy;
-    root.append(head, count, open);
+    // Taking things away (feature 016): no choices to make, so these go straight to the preview.
+    const off = !editable || chosen === 0 || s.busy;
+    const remove = button('Remove from solution...', 'secondary', h.previewRemove);
+    remove.prepend(icon('minus'));
+    remove.disabled = off || allInUse;
+    remove.title = allInUse ? 'Used by flows: re-point those flows first' : 'Takes the selected rows out of this solution; they stay in the environment';
+    const del = button('Delete...', 'danger', h.previewDelete);
+    del.prepend(icon('trash'));
+    del.disabled = off || allInUse;
+    del.title = allInUse ? 'Used by flows: re-point those flows first' : 'Deletes the selected rows from the environment';
+    const actions = el('div', 'action-buttons');
+    // Only connection references can be taken out or deleted from here; flows are only re-pointed.
+    actions.append(...(refs ? [remove, del] : []), open);
+    root.append(head, count, actions);
     return root;
+}
+
+/** Remove and Delete open one dialog over the list instead of a Preview step (feature 019). */
+function removalDialogOpen(s: State): boolean {
+    return s.wizard !== null && s.wizard.step === 'preview' && s.plan !== null && (s.plan.kind === 'remove' || s.plan.kind === 'delete');
 }
 
 /** The step screens of a change: Preview, Apply, Result. */
 function wizardScreen(s: State, store: Store, h: Handlers, environment: string): HTMLElement {
     const w = s.wizard!;
     const snap = s.snapshot!;
-    const root = el('div');
+    const root = el('div', 'screen');
     const back = () => store.dispatch({ type: 'closePlan' });
     if (w.step === 'preview' && s.plan) {
         root.append(previewStep({ plan: s.plan, snapshot: snap, wizard: w }, {
             back,
             apply: () => store.dispatch({ type: 'openConfirm' }),
             setLayout: layout => store.dispatch({ type: 'setLayout', layout }),
-            setMode: (id, mode) => store.dispatch({ type: 'setItemMode', id, mode }),
+            setTab: tab => store.dispatch({ type: 'setTab', tab }),
             toggle: id => store.dispatch({ type: 'toggleItem', id }),
             more: () => store.dispatch({ type: 'showMore' }),
         }));
     } else if (w.step === 'apply') {
-        root.append(applyStep(w, environment));
+        root.append(applyStep(w, environment, s.plan?.rows ?? []));
     } else if (w.step === 'result') {
         root.append(resultStep({ wizard: w, results: s.results ?? [], solutionName: snap.solution.name, environment }, { saveReport: h.saveReport, back: () => store.dispatch({ type: 'dismissResults' }) }));
     }
     if (w.confirmOpen && s.plan) {
         root.append(confirmModal(
-            { plan: s.plan, snapshot: snap, environment, ack: s.planAck, backupSaved: s.backupSaved, expanded: s.dialogExpanded, stateAck: s.stateAck },
-            { confirm: h.confirm, cancel: () => store.dispatch({ type: 'closeConfirm' }), saveBackup: h.saveBackup, setAck: on => store.dispatch({ type: 'setAck', on }), setExpanded: on => store.dispatch({ type: 'setDialogExpanded', on }), setStateAck: on => store.dispatch({ type: 'setStateAck', on }) },
+            { plan: s.plan, snapshot: snap, environment, ack: s.planAck, backupSaved: s.backupSaved, expanded: s.dialogExpanded, stateAck: s.stateAck, manageState: s.manageState },
+            { confirm: h.confirm, cancel: () => store.dispatch({ type: 'closeConfirm' }), saveBackup: h.saveBackup, setAck: on => store.dispatch({ type: 'setAck', on }), setExpanded: on => store.dispatch({ type: 'setDialogExpanded', on }), setStateAck: on => store.dispatch({ type: 'setStateAck', on }), setManageState: h.setManageState },
         ));
     }
     return root;
 }
 
 function solutionDetail(s: State, store: Store, h: Handlers, environment: string): HTMLElement {
-    if (s.wizard) return wizardScreen(s, store, h, environment);
+    if (s.wizard && !removalDialogOpen(s)) return wizardScreen(s, store, h, environment);
     const snap = s.snapshot!;
     const flagged = snap.flows.filter(f => f.flags.length > 0).length + snap.references.filter(r => r.flags.length > 0).length;
     const p = panel(snap.solution.name, `${snap.flows.length} flows, ${snap.references.length} connection references${flagged > 0 ? `, ${flagged} need attention` : ''}`);
@@ -243,7 +273,7 @@ function solutionDetail(s: State, store: Store, h: Handlers, environment: string
 
     const hint = el('p', 'hint-line');
     hint.append(icon('info', 'icon--sm'), 'Click a row to see its details. The connection owner and state are not available from the connected environment: the owner shown is the owner of the reference.');
-    p.body.append(hint, actionStrip(s, store));
+    p.body.append(hint, actionStrip(s, store, h));
 
     const { table: listTable, count } = s.view === 'flows' ? flowsTable(s, store) : referencesTable(s, store);
     if (count === 0) {
@@ -251,8 +281,14 @@ function solutionDetail(s: State, store: Store, h: Handlers, environment: string
     } else {
         p.body.append(listTable);
     }
-    if (s.studio) p.root.append(studioDialog(s, store, h, environment));
+    if (removalDialogOpen(s)) {
+        p.root.append(removalModal(
+            { plan: s.plan!, snapshot: snap, environment, ack: s.planAck, backupSaved: s.backupSaved, code: s.confirmCode, typed: s.typedCode, stateAck: s.stateAck },
+            { confirm: h.confirm, cancel: () => store.dispatch({ type: 'closePlan' }), saveBackup: h.saveBackup, setAck: on => store.dispatch({ type: 'setAck', on }), setTyped: h.setTypedCode, setStateAck: on => store.dispatch({ type: 'setStateAck', on }) },
+        ));
+    } else if (s.studio) p.root.append(studioDialog(s, store, h, environment));
     else resetStudioMotion();
+    p.root.classList.add('screen');
     return p.root;
 }
 
@@ -266,13 +302,14 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
             crumbs.hidden = s.solutionId === '';
             if (s.solutionId !== '') {
                 const name = s.snapshot?.solution.name ?? s.solutions.find(x => x.id === s.solutionId)?.name ?? '';
-                const w = s.wizard;
+                const w = removalDialogOpen(s) ? null : s.wizard;
                 // During the write nothing can be left; before it, going back to the solution discards the plan.
                 const canLeave = w === null || w.step !== 'apply';
                 const toSolution = () => (w && w.step === 'result' ? store.dispatch({ type: 'dismissResults' }) : store.dispatch({ type: 'closePlan' }));
                 const trail = w === null ? [{ label: name }] : [
                     { label: name, ...(canMove(w.step, 'leave') ? { onClick: toSolution } : {}) },
-                    ...crumbsFor(w.step).map(c => ({ label: c.label })),
+                    // the stepper already shows the steps that were done: the breadcrumb names only where you are
+                    ...crumbsFor(w.step).slice(-1).map(c => ({ label: c.label })),
                 ];
                 crumbs.append(...breadcrumb([{ label: 'Solutions', ...(canLeave ? { onClick: () => h.selectSolution('') } : {}) }, ...trail]).childNodes);
             }
@@ -294,11 +331,22 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         root.append(solutionDetail(s, store, h, environment()));
     };
     // The view is rebuilt on every change; keep the focused field and its caret, found again by its label.
+    // A different page (another solution, view, step or tab) always opens at the top; a redraw of the same page keeps its place.
+    let lastPage = '';
+    const pageKey = (): string => {
+        const s = store.get();
+        const w = s.wizard;
+        return [s.solutionId, s.snapshot === null ? 'loading' : s.view, w ? `${w.step}:${w.operation}:${w.tab}` : '', removalDialogOpen(s) ? 'removal' : ''].join('|');
+    };
     const render = () => {
+        const key = pageKey();
+        const samePage = key === lastPage;
+        lastPage = key;
         const page = root.closest<HTMLElement>('.main-content');
         const pageTop = page?.scrollTop ?? 0;
         const wrapTop = root.querySelector<HTMLElement>('.table-wrap')?.scrollTop ?? 0;
         const modalTop = root.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0;
+        const stepTop = root.querySelector<HTMLElement>('.step-body')?.scrollTop ?? 0;
         const reopened = root.querySelector('.modal') !== null;
         const paneTops = [...root.querySelectorAll<HTMLElement>('.studio-pane-body')].map(p => p.scrollTop);
         const active = document.activeElement as HTMLInputElement | null;
@@ -306,9 +354,11 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const start = label !== null && typeof active!.selectionStart === 'number' ? active!.selectionStart : null;
         const end = label !== null && typeof active!.selectionEnd === 'number' ? active!.selectionEnd : null;
         draw();
-        if (page) page.scrollTop = pageTop;
+        if (page) page.scrollTop = samePage ? pageTop : 0;
         const wrap = root.querySelector<HTMLElement>('.table-wrap');
-        if (wrap) wrap.scrollTop = wrapTop;
+        if (wrap) wrap.scrollTop = samePage ? wrapTop : 0;
+        const stepBody = root.querySelector<HTMLElement>('.step-body');
+        if (stepBody) stepBody.scrollTop = samePage ? stepTop : 0;
         const modalBody = root.querySelector<HTMLElement>('.modal-body');
         if (modalBody) modalBody.scrollTop = modalTop;
         // a re-draw of an open studio is not an opening: no animation, and the lists stay where they were

@@ -9,7 +9,8 @@ import type { Plan, RowOutcome, Snapshot, SolutionInfo } from '../types';
 
 export type ViewName = 'flows' | 'references';
 export type DiffLayout = 'split' | 'unified';
-export type ItemMode = 'diff' | 'table';
+/** The two views of the Preview: the code diff of every item, or one before-and-after table. */
+export type PreviewTab = 'diff' | 'table';
 
 /** Items of the Preview step shown at a time. */
 export const PAGE_ITEMS = 20;
@@ -19,8 +20,7 @@ export interface Wizard {
     readonly operation: OperationKind;
     readonly step: WizardStep;
     readonly layout: DiffLayout;
-    /** Diff or table, per item (diff when absent). */
-    readonly modes: Readonly<Record<string, ItemMode>>;
+    readonly tab: PreviewTab;
     /** Items whose card is collapsed. */
     readonly collapsed: readonly string[];
     /** How many items the Preview shows. */
@@ -40,7 +40,7 @@ export interface Wizard {
 }
 
 function freshWizard(operation: OperationKind): Wizard {
-    return { operation, step: 'preview', layout: 'split', modes: {}, collapsed: [], shown: PAGE_ITEMS, confirmOpen: false, startedAt: 0, now: 0, total: 0, live: [], phase: 'write', states: false, finishedAt: null, refreshFailed: false };
+    return { operation, step: 'preview', layout: 'split', tab: 'diff', collapsed: [], shown: PAGE_ITEMS, confirmOpen: false, startedAt: 0, now: 0, total: 0, live: [], phase: 'write', states: false, finishedAt: null, refreshFailed: false };
 }
 
 export interface State {
@@ -70,6 +70,9 @@ export interface State {
     readonly planAck: boolean;
     /** The user ticked that flows will be turned off and on again (feature 011). */
     readonly stateAck: boolean;
+    /** Delete only: the code the user has to copy and paste to unlock it, and what was pasted. */
+    readonly confirmCode: string;
+    readonly typedCode: string;
     /** The user allows the tool to turn flows that are on off and on again; off by default. */
     readonly manageState: boolean;
     /** A backup of the previewed values was saved from the dialog. */
@@ -105,9 +108,11 @@ export type Action =
     | { type: 'setRepoint'; from: string | readonly string[]; target: string }
     | { type: 'setGroups'; groups: readonly RepointGroup[] }
     | { type: 'setGroup'; group: RepointGroup }
-    | { type: 'openPlan'; plan: Plan }
+    | { type: 'openPlan'; plan: Plan; code?: string }
+    | { type: 'setTypedCode'; value: string }
+    | { type: 'replacePlan'; plan: Plan }
     | { type: 'setLayout'; layout: DiffLayout }
-    | { type: 'setItemMode'; id: string; mode: ItemMode }
+    | { type: 'setTab'; tab: PreviewTab }
     | { type: 'toggleItem'; id: string }
     | { type: 'showMore' }
     | { type: 'openConfirm' }
@@ -146,6 +151,8 @@ export function initialState(): State {
         wizard: null,
         planAck: false,
         stateAck: false,
+        confirmCode: '',
+        typedCode: '',
         manageState: false,
         backupSaved: false,
         results: null,
@@ -198,7 +205,7 @@ function groupsFor(s: State, from: readonly string[], target: string): RepointGr
 /** Without a preview there is nothing to acknowledge and no backup to speak of. */
 function settled(s: State): State {
     const reviewing = s.wizard !== null && s.wizard.step !== 'result';
-    return !reviewing && (s.planAck || s.stateAck || s.backupSaved) ? { ...s, planAck: false, stateAck: false, backupSaved: false } : s;
+    return !reviewing && (s.planAck || s.stateAck || s.backupSaved || s.typedCode !== '') ? { ...s, planAck: false, stateAck: false, backupSaved: false, typedCode: '' } : s;
 }
 
 /** The studio only exists where there is something to choose for: a loaded, unmanaged solution and a selection. */
@@ -283,7 +290,12 @@ function step(s: State, a: Action): State {
         case 'setDialogExpanded':
             return { ...s, dialogExpanded: a.on };
         case 'openPlan':
-            return { ...s, studio: false, plan: a.plan, wizard: freshWizard(a.plan.kind), planAck: false, stateAck: false, backupSaved: false };
+            return { ...s, studio: false, plan: a.plan, wizard: freshWizard(a.plan.kind), planAck: false, stateAck: false, backupSaved: false, confirmCode: a.code ?? '', typedCode: '' };
+        case 'replacePlan':
+            // The same preview with another reading of the same choices (the permission changed): what was ticked no longer applies.
+            return s.wizard && s.wizard.step === 'preview' ? { ...s, plan: a.plan, planAck: false, stateAck: false, backupSaved: false } : s;
+        case 'setTypedCode':
+            return s.plan ? { ...s, typedCode: a.value } : s;
         case 'setAck':
             return s.plan ? { ...s, planAck: a.on } : s;
         case 'setStateAck':
@@ -299,8 +311,8 @@ function step(s: State, a: Action): State {
             return s.wizard && canMove(s.wizard.step, 'leave') && s.wizard.step !== 'result' ? { ...s, plan: null, wizard: null } : s;
         case 'setLayout':
             return s.wizard ? { ...s, wizard: { ...s.wizard, layout: a.layout } } : s;
-        case 'setItemMode':
-            return s.wizard ? { ...s, wizard: { ...s.wizard, modes: { ...s.wizard.modes, [a.id]: a.mode } } } : s;
+        case 'setTab':
+            return s.wizard ? { ...s, wizard: { ...s.wizard, tab: a.tab } } : s;
         case 'toggleItem':
             return s.wizard ? { ...s, wizard: { ...s.wizard, collapsed: s.wizard.collapsed.includes(a.id) ? s.wizard.collapsed.filter(x => x !== a.id) : [...s.wizard.collapsed, a.id] } } : s;
         case 'showMore':
@@ -313,7 +325,9 @@ function step(s: State, a: Action): State {
             // The only way into Apply: from Preview, with the dialog open and the acknowledgements ticked (the second
             // one only when flows will be turned off).
             const states = s.plan !== null && turnOffRows(s.plan).length > 0;
-            return s.plan && s.wizard && s.wizard.step === 'preview' && s.wizard.confirmOpen && s.planAck && (!states || s.stateAck)
+            // Delete is also locked until the code that was shown has been pasted.
+            const unlocked = s.plan?.kind !== 'delete' || (s.confirmCode !== '' && s.typedCode.trim() === s.confirmCode);
+            return s.plan && s.wizard && s.wizard.step === 'preview' && s.wizard.confirmOpen && s.planAck && unlocked && (!states || s.stateAck)
                 ? { ...s, busy: true, wizard: { ...s.wizard, step: 'apply', confirmOpen: false, startedAt: a.now, now: a.now, total: a.total, live: [], phase: states ? 'off' : 'write', states, finishedAt: null, refreshFailed: false } }
                 : s;
         }

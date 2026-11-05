@@ -59,7 +59,7 @@ describe('planRepointGroups', () => {
     });
     it('flows that are on, suspended or managed are blocked as before', () => {
         const s = snap([flow(10, ['sample_ref1', 'sample_ref5'], { name: 'On', stateCode: 1 }), flow(11, ['sample_ref2'], { name: 'Susp', stateCode: 2 })]);
-        expect(plan([A_GROUP, B_GROUP], [guid(10), guid(11)], s).rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first.', 'The flow is not off (suspended): turn it off first.']);
+        expect(plan([A_GROUP, B_GROUP], [guid(10), guid(11)], s).rows.map(r => r.blocked)).toEqual(['The flow is turned on: turn it off first, or allow the tool to turn it off in the confirmation.', 'The flow is not off (suspended): turn it off first.']);
     });
     it('warns once for the flows that hold more than one chosen reference, and keeps the owner warnings of every new reference', () => {
         const s = snap([flow(10, ['sample_ref1', 'sample_ref2', 'sample_ref5'], { name: 'Two of A' }), flow(11, ['sample_ref6', 'sample_ref5'], { name: 'Two of B' }), flow(12, ['sample_ref1'], { name: 'One' })]);
