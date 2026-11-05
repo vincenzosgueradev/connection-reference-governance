@@ -1,0 +1,14 @@
+{
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "[ -f ../../scripts/sync-template.ps1 ] && pwsh -NoProfile -File ../../scripts/sync-template.ps1 -Tool connection-reference-governance -Quiet || true"
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vscode/
+.env
+.env.local
+.env.*.local
+*.tmp
+Thumbs.db
+
+# Real packages/exports from a tenant must never be committed (fixtures are generated)
+test/**/*.zip
+scratch/
+scratch-*.log
+scratch-*.mjs
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
