@@ -1,0 +1,144 @@
+import type { FlowInfo } from './model/flowinfo';
+
+/** Plain data contracts shared by all layers. Imports nothing from the other layers. */
+
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export interface SolutionInfo {
+    readonly id: string;
+    readonly name: string;
+    readonly uniqueName: string;
+    readonly managed: boolean;
+    readonly version: string;
+    readonly publisher: string;
+    /** ISO date, empty when unknown. */
+    readonly createdOn: string;
+}
+
+export interface ConnectionReferenceRow {
+    readonly id: string;
+    readonly logicalName: string;
+    readonly displayName: string;
+    readonly connectorId: string;
+    /** Id of the custom connector row (lookup `customconnectorid`); empty for a standard connector. */
+    readonly customConnectorId: string;
+    /** API hub connection name; empty when never set. */
+    readonly connectionId: string;
+    readonly ownerName: string;
+    /** systemuser or team id of the reference row owner (raw, lower case); empty when unknown. */
+    readonly ownerId: string;
+    readonly managed: boolean;
+}
+
+export interface FlowRow {
+    readonly id: string;
+    readonly name: string;
+    /** 0 draft, 1 activated, 2 suspended. */
+    readonly stateCode: number;
+    readonly managed: boolean;
+    readonly clientData: string;
+    readonly description: string;
+    /** ISO dates, empty when unknown. */
+    readonly createdOn: string;
+    readonly modifiedOn: string;
+    /** systemuser or team id of the flow owner (raw, lower case) and its name when it could be read. */
+    readonly ownerId: string;
+    readonly ownerName: string;
+}
+
+/** Optional facts about a connection, from a verified source only (see research.md). */
+export interface ConnectionInfo {
+    readonly ownerName: string;
+    readonly connected: boolean;
+}
+
+/** Everything read for one solution. */
+export interface SnapshotInput {
+    readonly solution: SolutionInfo;
+    /** Every reference of the environment (to detect missing ones). */
+    readonly references: readonly ConnectionReferenceRow[];
+    /** Ids of references that are members of the solution. */
+    readonly memberReferenceIds: readonly string[];
+    readonly flows: readonly FlowRow[];
+    /** Keyed by connectionId. Empty when no verified source exists. */
+    readonly connections: Readonly<Record<string, ConnectionInfo>>;
+}
+
+export type FlagKind = 'no-connection' | 'other-owner' | 'not-connected' | 'missing-reference';
+
+export interface Flag {
+    readonly kind: FlagKind;
+    /** Short text for the table; `detail` is the full sentence. */
+    readonly label: string;
+    /** The data the flag is based on, shown to the user. */
+    readonly detail: string;
+}
+
+export interface FlowRefUse {
+    readonly logicalName: string;
+    /** Undefined when the reference does not exist in the environment. */
+    readonly reference: ConnectionReferenceRow | undefined;
+    readonly flags: readonly Flag[];
+}
+
+export interface FlowView {
+    readonly flow: FlowRow;
+    readonly info: FlowInfo;
+    readonly uses: readonly FlowRefUse[];
+    readonly flags: readonly Flag[];
+    /** True when the clientdata could not be parsed. */
+    readonly unreadable: boolean;
+}
+
+export interface ReferenceView {
+    readonly reference: ConnectionReferenceRow;
+    readonly flowIds: readonly string[];
+    readonly flags: readonly Flag[];
+}
+
+export interface Snapshot {
+    readonly solution: SolutionInfo;
+    readonly flows: readonly FlowView[];
+    readonly references: readonly ReferenceView[];
+    /** References of the environment, used as candidates for targets and connection ids. */
+    readonly allReferences: readonly ConnectionReferenceRow[];
+}
+
+export interface PlanRow {
+    /** Row id in Dataverse. */
+    readonly id: string;
+    readonly label: string;
+    readonly field: 'connectionid' | 'clientdata';
+    readonly oldValue: string;
+    readonly newValue: string;
+    /** The exact value written to `field`. */
+    readonly payload: string;
+    readonly affectedFlows: number;
+    /** How many of the affected flows are turned on right now. */
+    readonly affectedOn: number;
+    /** The value of `field` when the plan was built; apply refuses the row if it has changed since. */
+    readonly expectedCurrent: string;
+    /** When set the row is blocked and will not be written. */
+    readonly blocked?: string;
+    /** The flow is on: with the user's permission it is turned off for the write and on again after it (feature 011). */
+    readonly turnOff?: boolean;
+}
+
+export interface Plan {
+    readonly kind: 'connection' | 'repoint';
+    readonly entity: 'connectionreference' | 'workflow';
+    readonly rows: readonly PlanRow[];
+    /** Things the user should read before confirming; they do not block. */
+    readonly warnings: readonly string[];
+    /** The user allowed the tool to turn flows that are on off and on again (feature 011). */
+    readonly manageState?: boolean;
+}
+
+export interface RowOutcome {
+    readonly id: string;
+    readonly label: string;
+    readonly status: 'done' | 'failed' | 'skipped';
+    readonly message: string;
+    /** Only for a flow the tool turned off: it is on again, or it was left off (feature 011). */
+    readonly stateChange?: 'back-on' | 'left-off';
+}

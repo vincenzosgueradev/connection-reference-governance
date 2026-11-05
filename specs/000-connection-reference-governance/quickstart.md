@@ -1,0 +1,41 @@
+# Manual checks (what tests cannot see)
+
+Run in a real development environment with a synthetic unmanaged solution (two flows, two references of the same connector, one of another). Record the result and date next to each line before a release. Repeat in light and dark theme.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | The solution list shows visible solutions; choosing one lists its modern flows and references (compare with the maker portal). | |
+| 2 | A flow using two references shows both; a reference used by nobody shows zero flows. | |
+| 3 | Connection reference membership resolves without a fixed component type (a reference added to the solution appears after Refresh). | |
+| 4 | Change the connection of one reference: preview shows the old id; after Apply the maker portal shows the new connection; the list is re-read. | |
+| 5 | A failing row (user without write privilege on one row) is reported alone; the others are done. | |
+| 6 | Re-point a flow that is **off**: open the flow in the maker portal and confirm the action uses the new reference and the flow still saves and turns on. | |
+| 7 | Re-point a flow that is **on**: blocked in the preview. Optional: test whether an active flow accepts the update; if it does, record the date here and in the tool constitution (T4) before removing the block. | |
+| 8 | Different connector target: blocked. Target outside the solution: blocked. | |
+| 9 | Managed solutions: the Managed tab is disabled with their count and a tooltip; none is listed or can be opened. | |
+| 10 | Confirm the `clientdata` shape (`connectionReferences` entries with `connection.connectionReferenceLogicalName`) on a real flow. | |
+| 11 | Look for any Dataverse table that exposes connection owner or state; if found, record it in research.md and enable the owner/state flags. | |
+| 12 | Narrow pane and both themes read well; no emoji; tables scroll inside the panel. | |
+| 13 | Re-point a flow, then open it in the maker portal: it must open, save and turn on. If it fails on `authentication` or the host reference name, record the exact message here: that is the evidence needed to add the extra rewrite (see research.md). | |
+| 14 | Change something in the maker portal between Preview and Apply: the row is skipped with "Changed by someone else". | |
+| 15 | Save a backup from the preview and open the file: ids, names and previous values are there. | |
+| 16 | Try a reference owned by another user as target: the warning shows; note whether the environment refuses the update. | |
+| 17 | Flows table: every connection on its own line with glyph, name, connector and connection; open a flow with 3 connections and a flow with none. Names match the maker portal. | |
+| 18 | A reference built on a custom connector shows the Custom connector chip next to the connector name (the column customconnectorid is set); a standard one does not. | |
+| 19 | Select and clear rows many times: the count, selects, buttons and table never change width or jump. Type in the filter and in the connection id field: the cursor stays. | |
+| 20 | Home screen: the header shows the connection name; the hero shows solutions and flows; the Flows column per solution matches the maker portal; sort by each column; search and clear; Updating... shows while it reads. | |
+| 21 | Flows table: the Type column (Instant / Automated / Scheduled) matches the maker portal for a button flow, an email-trigger flow, a recurrence flow and an HTTP-request flow. Open each row: trigger, actions, owner, dates and connections look right. | |
+| 22 | Narrow the PPTB window step by step: columns drop out in order (Modified, Connections, Type), nothing overlaps, details stay readable, the page and the table keep their scroll when you select or open rows. | |
+| 23 | Icons: flow types, states, warnings, detail labels, buttons and tiles read well and keep their colour in both themes; a state is never shown by colour alone (it always has a word). | |
+| 24 | Re-point: with flows selected, With is disabled until Replace is chosen; it lists only other references of the same connector; changing Replace to another connector clears With; Replace shows how many of the selected flows use each reference. | |
+| 25 | Confirmation dialog (both operations): opens over the screen with the environment, four figures, a before-and-after line per row, warnings, backup; Apply is disabled until the acknowledgement is ticked; Cancel, Escape and the close button write nothing; Tab stays inside; it fits a narrow pane and both themes. | |
+| 26 | Guided path: from the choices, Review changes opens Review with the stepper (Choose done, Review current), the title with its icon and the breadcrumb; Back returns to the choices with selection and choices kept; Continue opens Preview; Back and the Review link return. Nothing is written until the confirmation. | |
+| 27 | Preview of a re-pointed flow: only the reference name line is removed and added (signs - and +, numbers, changed word highlighted), three lines of context, collapsed bands with the number of unchanged lines; Split and Unified; Diff and Table per item; collapse an item; both themes; long lines scroll inside the frame. | |
+| 28 | Preview with a real flow definition of thousands of lines: the page stays responsive and the diff is short. With more than twenty items, Show 20 more works. | |
+| 29 | Apply: the timeline shows Confirmed, Write and verify, Refresh, Summary; the status line counts rows and the time moves every second; each row appears as it finishes; Back is disabled; the Result opens by itself. | |
+| 30 | Result: banner, figures (changed, skipped, failed, duration) add up to the rows; failed and skipped rows are first; Save report writes a readable file; Back to solution shows the new values. Try one run with a row you have no right to write. | |
+| 31 | Studio (features 010, 013): select flows, Choose changes... opens the dialog; Expand fills the window and Restore size returns. References to replace are grouped by connector, each with its colour, share bar and percentage; tick one, some or all per category, or Select every category; each ticked category asks for its own new reference; Review changes stays closed until all have one. | |
+| 32 | Two categories (for example Outlook and SharePoint) in one operation: the review shows one row per flow with every reference lost and gained; one run writes each flow once. | |
+| 33 | Studio pipeline (feature 014): one connector at a time; Next is closed while references are ticked without a new one; Back and a click on a step keep every choice; the step slides in only when it changes; the Summary lists Done, Incomplete or Not changed with Edit; the overview with its trash buttons stays under every step. | |
+| 34 | Flow state (feature 011): with an unmanaged solution, a flow that is on and a flow that is off selected; the permission is off and the flow that is on stays blocked; turn it on: the dialog lists the consequences and the flow names and asks for two acknowledgements; the run shows Turn off, Write and verify, Turn on; the flow that was on is on again, the one that was off was never touched; try a flow owned by another user and one whose connection is invalid to see the failure messages and the "left turned off" banner. | |
+| 35 | Shorter path (feature 015): Review changes in the studio opens the Preview directly; the stepper has Choose, Preview, Apply, Result; Back returns to the choices with nothing written; with only flows that are on and no permission the Preview shows the "No row can be written" banner with the reasons. | |
