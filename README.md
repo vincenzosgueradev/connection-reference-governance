@@ -10,8 +10,9 @@ See which connection references every flow in a solution uses, find references w
 - Flags what the data proves: a reference with no connection set, and a flow that declares a reference that does not exist.
 - Change the connection of selected references in bulk, with a preview that lists every row, the old value and the number of flows affected.
 - Re-point selected flows to another reference of the same solution and connector, with the same preview and a per-row result.
+- In the Re-point dialog: **New reference** creates a connection reference of the category's connector in the open solution: the connector is fixed, the name is checked against the environment, ready-made names and descriptions can be applied with one click (Maker style, readable, by account), the connection is optional and is accepted only when it is found among your connections (listed through the Power Platform API; paste an id and press Check), a Review step shows the exact record, and the row is read back after the write.
 - In the Connection references view: remove the selected references from the solution (they stay in the environment), or delete them from the environment, each with the same preview, confirmation and per-row result.
-- A change runs as a guided path with a stepper and a breadcrumb: Choose, Review (the plan in words and figures), Preview (two tabs: the exact content as a line diff, split or unified, and a table of what each item is now and will be), Apply (a timeline with the time elapsed and the rows as they finish) and Result (a banner, figures, one line per row and a report you can save). You can go back until the write starts; after that the only way out is the Result.
+- A change runs as a guided path with a stepper and a breadcrumb: Choose, Preview (two tabs: the exact content as a line diff, split or unified, and a table of what each item is now and will be), Apply (a timeline with the time elapsed and the rows as they finish) and Result (a banner, figures, one line per row and a report you can save). You can go back until the write starts; after that the only way out is the Result.
 - Before anything is written a confirmation dialog opens over the screen: the environment, the scope in four figures (rows to change, flows affected, flows turned on, rows not changed), one before-and-after line per row, the warnings, the offer to save a backup of the old values, and an acknowledgement you must tick before Apply is enabled. Cancel, Escape and the close button write nothing.
 - When re-pointing, the new reference can only be another reference of the same connector in the solution, and is disabled until you choose which reference to replace.
 - Each row is checked again just before it is written (skipped if someone changed it meanwhile) and read back afterwards.
@@ -19,14 +20,14 @@ See which connection references every flow in a solution uses, find references w
 
 ## What this tool changes
 
-It reads solutions, solution components, connection references and flows (modern flows, not desktop flows) from the connected Dataverse environment. It writes only after you review a preview and confirm:
+It reads solutions, solution components, connection references and flows (modern flows, not desktop flows) from the connected Dataverse environment. When you create a connection reference it also reads, read only, the list of your connections of that environment from the Power Platform API (the API has to be enabled on the connection in Power Platform ToolBox; without it you can still create a reference with no connection yet). Nothing read is stored or sent anywhere else. It writes only after you review a preview and confirm:
 
 - the connection of existing connection references (the connection id column);
 - the flow definition of existing flows, only the name of the connection reference a flow points to;
 - the membership of connection references in the open unmanaged solution (**Remove from solution**): the rows themselves stay in the environment;
 - the existence of connection references (**Delete**): the rows are deleted from the environment and so from every solution. This cannot be undone. The confirmation says so in its own words, asks for an acknowledgement, offers a file with the reference records first, and stays locked until you have copied and pasted a code shown in the dialog. A reference that anything depends on (the environment is asked just before, and again at the moment of the delete) is never deleted.
 
-A reference that a flow of the solution still uses cannot be removed or deleted: re-point those flows first. It never creates anything. Only flows that are turned off are re-pointed: turn them off first. Undo is not offered for writes to Dataverse; the preview lists the old values so you can restore them by hand.
+A reference that a flow of the solution still uses cannot be removed or deleted: re-point those flows first. It creates only one thing: a new connection reference of the same connector, from the re-point dialog, after a review step that shows the exact record. Only flows that are turned off are re-pointed: turn them off first. Undo is not offered for writes to Dataverse; the preview lists the old values so you can restore them by hand.
 
 Connection owner and connection state are not available from the connected environment, so the tool shows the owner of the reference and does not flag by connection owner or state.
 

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import { createController } from '../../src/controller';
 import type { Host } from '../../src/host';
 import { initialState } from '../../src/state/reducer';
@@ -16,6 +16,19 @@ import { clientData, flow, ref, solution } from './fixtures';
 export interface ScenarioOptions {
     references?: ConnectionReferenceRow[];
     flows?: FlowRow[];
+    /** The connections the Power Platform API lists; 'unavailable' makes the list fail; a function gives them per call. */
+    connections?: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] | 'unavailable';
+    /** Waits before the row is created / before it is added to the solution, so a test can look at the screen in the middle. */
+    beforeCreate?: () => Promise<void>;
+    beforeAdd?: () => Promise<void>;
+    /** How long the "Created" state is shown before the panel closes (ms); 0 in tests unless asked. */
+    celebrateMs?: number;
+    /** Makes reading the environment id return nothing. */
+    noEnvironmentId?: boolean;
+    /** Makes the creation of a reference fail with this message. */
+    failCreate?: string;
+    /** Makes adding a created reference to the solution fail with this message. */
+    failAdd?: string;
     /** Makes an update fail with this message. */
     failUpdate?: (id: string) => string | undefined;
     /** Waits before an update is applied, so a test can look at the screen in the middle of a run. */
@@ -32,6 +45,14 @@ export interface ScenarioOptions {
 
 const B = '/providers/Microsoft.PowerApps/apis/shared_b';
 export const defaultReferences = (): ConnectionReferenceRow[] => [ref(1), ref(2), ref(3), ref(4, { connectorId: B })];
+/** The connections the default scenario lists: the ones the default references hold, plus one nobody uses yet. */
+export const defaultConnections = () => [
+    { name: 'conn-1', connector: 'shared_a', displayName: 'one@example.test' },
+    { name: 'conn-2', connector: 'shared_a', displayName: 'two@example.test' },
+    { name: 'conn-3', connector: 'shared_a', displayName: 'three@example.test' },
+    { name: 'conn-free', connector: 'shared_a', displayName: 'free@example.test' },
+    { name: 'conn-4', connector: 'shared_b', displayName: 'four@example.test' },
+];
 export const REQUEST = { manual: { type: 'Request', kind: 'Button' } };
 export const defaultFlows = (): FlowRow[] => [
     flow(10, ['sample_ref1'], { name: 'Alpha flow', clientData: clientData(['sample_ref1'], {}, REQUEST) }),
@@ -44,7 +65,9 @@ export function scenario(opts: ScenarioOptions = {}) {
     const refs = (opts.references ?? defaultReferences()).map(r => ({ ...r }));
     const flows = (opts.flows ?? defaultFlows()).map(f => ({ ...f }));
     let wrote = false;
-    const calls = { queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
+    const notMember = new Set<string>(); // created references until they are added to the solution
+    let nextId = 500;
+    const calls = { connectionReads: 0, created: [] as Record<string, unknown>[], added: [] as { solution: string; id: string; type: number }[], queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
 
     const host: Host = {
         async query(q) {
@@ -57,13 +80,23 @@ export function scenario(opts: ScenarioOptions = {}) {
                 const f = flows.find(x => x.id === id);
                 return f ? [{ [col!]: col === 'statecode' ? f.stateCode : f.clientData }] : [];
             }
+            const lname = /connectionreferencelogicalname eq '([^']+)'$/.exec(q);
+            if (lname) return refs.filter(r => r.logicalName === lname[1]).map(r => ({ connectionreferenceid: r.id }));
+            if (q.startsWith('connectionreferences?') && /connectionreferenceid eq [0-9a-f-]+$/.test(q) && q.includes('connectorid')) {
+                const id = /eq ([0-9a-f-]+)$/.exec(q)![1];
+                return refs.filter(r => r.id === id).map(r => ({ connectionreferenceid: r.id, connectionreferencelogicalname: r.logicalName, connectionreferencedisplayname: r.displayName, connectorid: r.connectorId, connectionid: r.connectionId, ismanaged: r.managed, _ownerid_value: r.ownerId, _customconnectorid_value: r.customConnectorId }));
+            }
+            const member = /objectid eq ([0-9a-f-]+)$/.exec(q);
+            if (q.startsWith('solutioncomponents?$select=objectid&') && member) return notMember.has(member[1]!) ? [] : [{ objectid: member[1] }];
+            if (q.startsWith('systemusers?') && q.includes('internalemailaddress')) return [{ systemuserid: '11111111-1111-4111-8111-111111111111', internalemailaddress: 'owner.a@example.test' }];
+            if (q.startsWith('systemusers?')) return [{ systemuserid: '11111111-1111-4111-8111-111111111111', fullname: 'Owner A' }];
             if (q.startsWith('solutions?')) return [{ solutionid: sol.id, friendlyname: sol.name, uniquename: sol.uniqueName, ismanaged: false, version: '1.0.0.0', createdon: '2026-01-01T00:00:00Z' }];
             if (q.startsWith('workflows?$select=workflowid&')) return flows.map(f => ({ workflowid: f.id }));
             if (q.startsWith('solutioncomponents?$select=_solutionid_value')) return flows.map(f => ({ _solutionid_value: sol.id, objectid: f.id }));
             if (q.startsWith('solutioncomponents')) {
                 if (wrote && opts.failRefresh) throw new Error('The environment did not answer.');
                 if (wrote) await opts.beforeRefresh?.();
-                return [...refs.map(r => ({ objectid: r.id, componenttype: 10001 })), ...flows.map(f => ({ objectid: f.id, componenttype: 29 }))];
+                return [...refs.filter(r => !notMember.has(r.id)).map(r => ({ objectid: r.id, componenttype: 10001 })), ...flows.map(f => ({ objectid: f.id, componenttype: 29 }))];
             }
             if (q.startsWith('connectionreferences?')) {
                 return refs.map(r => ({ connectionreferenceid: r.id, connectionreferencelogicalname: r.logicalName, connectionreferencedisplayname: r.displayName, connectorid: r.connectorId, connectionid: r.connectionId, ismanaged: r.managed, _ownerid_value: r.ownerId, _customconnectorid_value: r.customConnectorId }));
@@ -87,7 +120,35 @@ export function scenario(opts: ScenarioOptions = {}) {
             if (f && 'clientdata' in record) f.clientData = String(record['clientdata']);
             if (f && 'statecode' in record && !opts.ignoreState) f.stateCode = Number(record['statecode']);
         },
-        async remove() {},
+        async environmentId() {
+            return opts.noEnvironmentId ? '' : 'env-1';
+        },
+        async listConnections(environmentId) {
+            calls.connectionReads++;
+            if (opts.connections === 'unavailable') throw new Error('The Power Platform API is not enabled for this connection.');
+            expect(environmentId).toBe('env-1');
+            const list: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] = opts.connections ?? defaultConnections();
+            return { value: list.map(c => ({ id: `/providers/Microsoft.PowerApps/apis/${c.connector}/connections/${c.name}`, name: c.name, properties: { displayName: c.displayName, createdTime: c.createdTime ?? '2026-01-01T00:00:00Z' } })) };
+        },
+        async create(_entity, record) {
+            await opts.beforeCreate?.();
+            if (opts.failCreate) throw new Error(opts.failCreate);
+            const id = `00000000-0000-4000-8000-${String(nextId++).padStart(12, '0')}`;
+            calls.created.push(record);
+            refs.push({ id, logicalName: String(record['connectionreferencelogicalname']), displayName: String(record['connectionreferencedisplayname']), connectorId: String(record['connectorid']), connectionId: String(record['connectionid'] ?? ''), customConnectorId: '', ownerName: '', ownerId: '11111111-1111-4111-8111-111111111111', managed: false });
+            notMember.add(id);
+            return id;
+        },
+        async addToSolution(solution, id, type) {
+            await opts.beforeAdd?.();
+            if (opts.failAdd) throw new Error(opts.failAdd);
+            calls.added.push({ solution, id, type });
+            notMember.delete(id);
+        },
+        async remove(_entity, id) {
+            const i = refs.findIndex(r => r.id === id);
+            if (i >= 0) refs.splice(i, 1);
+        },
         async dependencies() { return []; },
         async removeFromSolution() {},
         async currentUserId() {
@@ -115,7 +176,7 @@ export async function app(opts: ScenarioOptions & { tickMs?: number } = {}) {
     const store = createStore(initialState());
     let now = 1_000_000;
     const clock = vi.fn(() => now);
-    const controller = createController(sc.host, store, clock, opts.tickMs ?? 5);
+    const controller = createController(sc.host, store, clock, opts.tickMs ?? 5, undefined, opts.celebrateMs ?? 0);
     const root = document.getElementById('content')!;
     mountMain(root, store, controller, controller.environment);
     await controller.start();

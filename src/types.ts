@@ -11,6 +11,8 @@ export interface SolutionInfo {
     readonly managed: boolean;
     readonly version: string;
     readonly publisher: string;
+    /** Customization prefix of the publisher (`ava`); empty when it could not be read. */
+    readonly prefix: string;
     /** ISO date, empty when unknown. */
     readonly createdOn: string;
 }
@@ -25,6 +27,8 @@ export interface ConnectionReferenceRow {
     /** API hub connection name; empty when never set. */
     readonly connectionId: string;
     readonly ownerName: string;
+    /** Email of the owner when it is a user and could be read; empty otherwise. Shown on screen only (T7). */
+    readonly ownerEmail?: string;
     /** systemuser or team id of the reference row owner (raw, lower case); empty when unknown. */
     readonly ownerId: string;
     readonly managed: boolean;
@@ -44,6 +48,17 @@ export interface FlowRow {
     /** systemuser or team id of the flow owner (raw, lower case) and its name when it could be read. */
     readonly ownerId: string;
     readonly ownerName: string;
+}
+
+/** A connection of the connected environment as the Power Platform API lists it (feature 021). */
+export interface LiveConnection {
+    /** The connection name: the value a reference stores in `connectionid`. */
+    readonly name: string;
+    /** Connector key without the `shared_` prefix, from the resource id; empty when the id was not given. */
+    readonly connectorKey: string;
+    /** `properties.displayName`: what the connection is called (for most connectors the account it signs in with). */
+    readonly displayName: string;
+    readonly createdTime: string;
 }
 
 /** Optional facts about a connection, from a verified source only (see research.md). */

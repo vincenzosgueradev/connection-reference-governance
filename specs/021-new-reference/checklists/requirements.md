@@ -1,0 +1,24 @@
+# Requirements checklist: New connection reference
+
+- [x] No other tool is named (independence)
+- [x] Every FR has a task and a test (FR-2101..2107: model, service, view, reducer tests)
+- [x] Constitution amended first (1.5.0, T2c) because T1 said nothing is created
+- [x] The write is previewed and confirmed (Review, Create); nothing written before
+- [x] No custom request header (`noCustomHeaders` still passes)
+- [x] Component type read, never guessed (T5), sources recorded
+- [x] Failure paths: name taken, type unknown, add refused, membership missing, stored value differs, rollback fails
+- [x] README and CHANGELOG say what the tool now creates
+- [x] No emoji, theme variables only, list re-read on entry (the snapshot is read again when the solution is opened)
+- [ ] Live check in a real environment (quickstart 41, PENDING 18)
+- [x] FR-2108 side panel: no horizontal scroll, buttons fixed in a footer, motion only on open and close, reduced motion respected
+- [x] FR-2109/2110 connection cards and the Used by list are tested; no emoji; the email is not logged
+- [x] FR-2111/2112/2113 each have a test (found, missing, other connector, unreadable, checked again before the write, every suggestion valid)
+- [x] Only documented fields of the Connections API are read (name, id, properties.displayName, properties.createdTime)
+- [x] The tool still works without the Power Platform API (no connection chosen); the feature flag is declared
+- [x] The slide is not restarted or cut by a redraw during it
+- [ ] Live check: the Connectivity call shape and the environment id in a real environment (quickstart 42)
+- [x] FR-2114 a created reference can be removed and deleted at once (test: create, then plan Remove and Delete without a refresh)
+- [x] FR-2115/2116 tested: the body keeps its scroll on a click; a suggestion is marked applied, the list folds, editing a field removes the mark
+- [x] FR-2117/2118 tested: nothing is looked up while typing; Enter and the icon search; a typed id is never accepted unchecked; Check does not disable itself
+- [x] FR-2119/2120 tested: each step is pending, active or done as the service reaches it; spinner and bar while writing; Created shown before closing; a failure restores the lines
+- [x] FR-2121 fields take the full width (guard on the stylesheet: the 380px cap is lifted)

@@ -164,7 +164,7 @@ describe('many items and big definitions', () => {
         const root = document.createElement('div');
         document.body.innerHTML = '';
         document.body.append(root);
-        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, previewRemove: () => undefined, previewDelete: () => undefined, setTypedCode: () => undefined, setManageState: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
+        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, previewRemove: () => undefined, previewDelete: () => undefined, createReference: () => undefined, openNewReference: () => undefined, refreshConnections: () => undefined, checkConnection: () => undefined, setTypedCode: () => undefined, setManageState: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
         mountMain(root, store, h, () => 'Env');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
@@ -194,7 +194,7 @@ describe('many items and big definitions', () => {
         store.dispatch({ type: 'openPlan', plan: { kind: 'repoint', entity: 'workflow', warnings: [], rows: [{ ...plan.rows[0]!, field: 'clientdata', expectedCurrent: a, payload: b }] } });
         expect(q(root, '.diff-note')!.textContent).toContain('too large to compare line by line');
         expect(q(root, '.diff-stat .diff-add')!.textContent).toBe('+2600');
-    });
+    }, 30_000); // a heavy diff of 2600 lines: under the load of the whole suite it can pass the default 5 seconds
 });
 
 describe('Apply... and Back', () => {

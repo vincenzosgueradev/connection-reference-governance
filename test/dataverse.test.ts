@@ -27,7 +27,7 @@ describe('loadSolutions: publisher, version and fallback', () => {
         const h = fakeHost(() => [{ solutionid: guid(1), friendlyname: 'One', uniquename: 'one', ismanaged: false, version: '1.0.0.5', createdon: '2026-01-02T03:04:05Z', publisherid: { friendlyname: 'Pub X' } }]);
         const r = await loadSolutions(h);
         expect(r.ok && r.value[0]).toMatchObject({ version: '1.0.0.5', createdOn: '2026-01-02T03:04:05Z', publisher: 'Pub X' });
-        expect(h.queries[0]).toContain('$expand=publisherid($select=friendlyname)');
+        expect(h.queries[0]).toContain('$expand=publisherid($select=friendlyname,customizationprefix)');
     });
     it('reads again without the publisher when the expand is refused', async () => {
         const h = fakeHost(q => {
@@ -235,7 +235,7 @@ describe('owner names', () => {
         const h = fakeHost(base(q => (q.startsWith('systemusers') ? [{ systemuserid: guid(700).toUpperCase(), fullname: 'Ann' }] : q.startsWith('teams') ? [{ teamid: guid(701), name: 'Team X' }] : undefined)));
         const r = await loadSnapshotInput(h, solution());
         expect(r.ok && r.value.references.map(x => x.ownerName)).toEqual(['Ann', 'Team X', 'Ann']);
-        const users = h.queries.filter(q => q.startsWith('systemusers'));
+        const users = h.queries.filter(q => q.startsWith('systemusers') && !q.includes('internalemailaddress'));
         expect(users).toHaveLength(1);
         expect(users[0]!.match(/eq/g)).toHaveLength(2);
     });

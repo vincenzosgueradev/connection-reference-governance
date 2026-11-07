@@ -1,0 +1,36 @@
+# Tasks: New connection reference
+
+- [x] T1 model/newReference.ts and test/newReference.model.test.ts
+- [x] T2 host create and addToSolution; SolutionInfo.prefix from the publisher expand
+- [x] T3 services createReference and referenceComponentType, with compensation; test/newReference.service.test.ts
+- [x] T4 reducer state and actions; test/reducer.newref.test.ts
+- [x] T5 views/newReference.ts, studio button and pane, styles; controller createReference
+- [x] T6 test/newReference.view.test.ts (end to end over the in-memory environment)
+- [x] T7 CHANGELOG, PENDING (live connection list), quickstart check
+- [x] T8 npm run build
+- [x] T9 Constitution 1.5.0: Purpose/T1 amended, T2c added, T5 sources recorded (analysis D1-D3)
+- [x] T10 README says what it creates; test/newReference.docs.test.ts guards it
+- [x] T11 checklists/requirements.md; spec edge cases and success criteria
+- [x] T12 Side panel: layer with scrim, header, steps, body, footer; slide in/out; Escape, scrim and close button
+- [x] T13 Studio appends the panel, right pane unchanged; focus to Display name; styles; tests updated
+- [x] T14 Analysis of the amendment (constitution T2c/T8, README, tests) and build
+- [x] T15 Model: richer connection choices (references, owners, emails, flows); service reads owner emails; form keeps open sections
+- [x] T16 Header rows (folder + solution, connector tile + connector), cards with one fact per line, Used by expander
+- [x] T17 Constitution T2c note on owner and email; tests; analysis; build
+- [x] T18 Research on Learn: Connections list API, naming guidance, column limits (recorded in the spec)
+- [x] T19 model/liveConnections.ts and its tests; form `live` and `seed`; verdict in checkForm; Dataverse limits
+- [x] T20 host `environmentId` and `listConnections`; service `loadLiveConnections`; createReference verifies the connection again
+- [x] T21 Reducer and controller: live states, refresh, stale answers ignored; one draw at open
+- [x] T22 Panel: connection cards from the list, Refresh, paste with Check, suggestions and Auto-fill, owner in Used by
+- [x] T23 Suggestions (Maker style, Readable, By account) and tests
+- [x] T24 package.json feature flag, README, constitution 1.6.0, quickstart, PENDING, CHANGELOG; analysis; build
+- [x] T25 Bug: the created reference kept no component type (Remove blocked, Delete unable to check dependencies until a refresh): the type returned by createReference travels with `referenceCreated` into the snapshot; tests at service, reducer and app level
+- [x] T26 Scroll of the panel body kept across redraws, per step (the real cause of the clicks that seemed not to work)
+- [x] T27 Applied mark on a suggestion and a folded suggestions bar; Auto-fill the same
+- [x] T28 Wider panel, header in one row, meta side by side; tests; build
+- [x] T29 Bug: the search icon scrolled the panel to the top (focus lost on a disabled button, then given to the first field): buttons stay enabled, autofocus only on opening, refocus without scrolling
+- [x] T30 Explicit search: typed id looked up only on Enter or the icon; model source and checked; actions pickConnection and connectionChecked; controller checkConnection; tests
+- [x] T31 Service `onStep` (check, write, readback); state `step`; action `newReferenceStep`
+- [x] T32 Panel: live timeline (pending, active, done), spinner in the button, indeterminate bar, Created state before closing; reduced motion
+- [x] T33 Constitution T8 (visible waits), tests, build; memory rule on the UX/UI standard
+- [x] T34 Fields at full width: the kit's 380px cap on `.text-input` is lifted for `.newref-input`; guard test

@@ -5,7 +5,9 @@ import { planConnectionChange, planRepointGroups } from './model/plans';
 import { planRemoval } from './model/removal';
 import { buildReport, reportFileName } from './model/report';
 import { operationLabel } from './model/workflow';
-import { applyPlan, loadFlowCounts, loadSnapshotInput, loadSolutions, readDependencies } from './services/dataverse';
+import { normalizeConnectionName, verifyConnection } from './model/liveConnections';
+import { randomSeed } from './model/newReference';
+import { applyPlan, createReference, loadLiveConnections, loadFlowCounts, loadSnapshotInput, loadSolutions, readDependencies } from './services/dataverse';
 import { log } from './services/log';
 import type { Store } from './state/store';
 import type { RowOutcome } from './types';
@@ -27,6 +29,8 @@ export function createController(
     clock: () => number = () => Date.now(),
     tickMs = 1000,
     makeCode: () => string = defaultCode,
+    /** How long the "Created" state is shown before the panel closes (ms). */
+    celebrateMs = 700,
 ): Handlers & { start(): Promise<void>; environment(): string; idle(): Promise<void> } {
     let environment = '';
     let userId = '';
@@ -85,6 +89,35 @@ export function createController(
         log(`Applied: ${results.filter(r => r.status === 'done').length} done, ${failed} failed.`, failed ? 'warning' : 'success');
     }
 
+    let reading = false;
+    /**
+     * Reads the connections of the environment for the open panel. With `check` the typed id is then looked up in them
+     * (only on Enter or the search icon, never while typing). A second request while one runs is ignored.
+     */
+    function readConnections(check: boolean): Promise<void> {
+        const form = store.get().newReference;
+        if (!form || form.saving || reading) return run;
+        reading = true;
+        store.dispatch({ type: 'connectionsLoading' });
+        const connectorId = form.connectorId;
+        const typed = form.connectionSource === 'typed' ? form.connectionId : '';
+        run = (async () => {
+            try {
+                const res = await loadLiveConnections(host);
+                if (store.get().newReference?.connectorId !== connectorId) return; // closed or changed while reading
+                if (res.ok) store.dispatch({ type: 'connectionsLoaded', items: res.value });
+                else {
+                    store.dispatch({ type: 'connectionsFailed', error: res.error });
+                    log(`The connections could not be read: ${res.error}`, 'warning');
+                }
+                if (check && typed !== '') store.dispatch({ type: 'connectionChecked', typed, verdict: verifyConnection(store.get().newReference?.live ?? { status: 'idle', items: [], error: '' }, connectorId, normalizeConnectionName(typed)) });
+            } finally {
+                reading = false;
+            }
+        })();
+        return run;
+    }
+
     return {
         environment: () => environment,
         idle: () => run,
@@ -137,6 +170,43 @@ export function createController(
             if (store.get().snapshot !== snapshot) return; // the user moved on while it was read
             store.dispatch({ type: 'openPlan', plan: planRemoval(snapshot, chosen, 'delete', deps), code: makeCode() });
             store.dispatch({ type: 'openConfirm' });
+        },
+        openNewReference(connectorId) {
+            store.dispatch({ type: 'openNewReference', connectorId, seed: randomSeed() });
+            if (store.get().newReference === null) return run;
+            return readConnections(false);
+        },
+        refreshConnections() {
+            return readConnections(false);
+        },
+        checkConnection() {
+            return readConnections(true);
+        },
+        createReference() {
+            const s = store.get();
+            const form = s.newReference;
+            const snapshot = s.snapshot;
+            if (!form || !snapshot || !form.reviewing || form.saving) return run;
+            // The state is the only authority: it starts the write only from a reviewed form.
+            store.dispatch({ type: 'newReferenceSaving' });
+            if (store.get().newReference?.saving !== true) return run;
+            run = (async () => {
+                const res = await createReference(host, snapshot, form, step => store.dispatch({ type: 'newReferenceStep', step }));
+                if (store.get().solutionId !== snapshot.solution.id) return; // the user moved on while it was written
+                if (res.ok) {
+                    // the end is shown (all steps done, "Created") for a moment before the panel closes
+                    store.dispatch({ type: 'newReferenceStep', step: 'done' });
+                    if (celebrateMs > 0) await new Promise<void>(done => setTimeout(done, celebrateMs));
+                    if (store.get().solutionId !== snapshot.solution.id) return;
+                    store.dispatch({ type: 'referenceCreated', reference: res.value.reference, componentType: res.value.componentType });
+                    log(`Created ${res.value.reference.logicalName} in ${snapshot.solution.name}.`, 'success');
+                    await host.notify(`Created ${res.value.reference.displayName || res.value.reference.logicalName}.`, 'success').catch(() => undefined);
+                } else {
+                    store.dispatch({ type: 'newReferenceFailed', error: res.error });
+                    log(res.error, 'error');
+                }
+            })();
+            return run;
         },
         setTypedCode(value) {
             store.dispatch({ type: 'setTypedCode', value });

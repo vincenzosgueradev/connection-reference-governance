@@ -1,7 +1,9 @@
 import type { Host, Record_ } from '../host';
-import type { ConnectionReferenceRow, FlowRow, Plan, Result, RowOutcome, Snapshot, SnapshotInput, SolutionInfo } from '../types';
+import type { ConnectionReferenceRow, FlowRow, LiveConnection, Plan, Result, RowOutcome, Snapshot, SnapshotInput, SolutionInfo } from '../types';
 import { readReferenceNames } from '../model/clientdata';
 import { turnOffRows, writableRows } from '../model/plans';
+import { parseConnections, verifyConnection, normalizeConnectionName } from '../model/liveConnections';
+import { checkForm, newReferenceRecord, type NewReferenceForm } from '../model/newReference';
 
 /** Use cases over a Host. No DOM. A view never builds an OData URL. */
 
@@ -24,6 +26,7 @@ function toSolution(r: Record_): SolutionInfo {
         managed: r['ismanaged'] === true,
         version: str(r['version']),
         publisher: typeof publisher === 'object' && publisher !== null ? str((publisher as Record_)['friendlyname']) : '',
+        prefix: typeof publisher === 'object' && publisher !== null ? str((publisher as Record_)['customizationprefix']) : '',
         createdOn: str(r['createdon']),
     };
 }
@@ -35,7 +38,7 @@ export async function loadSolutions(host: Host): Promise<Result<SolutionInfo[]>>
     try {
         // The publisher name is a convenience: if the expand is refused, read the solutions without it.
         try {
-            rows = await host.query(`${base}&$expand=publisherid($select=friendlyname)${tail}`);
+            rows = await host.query(`${base}&$expand=publisherid($select=friendlyname,customizationprefix)${tail}`);
         } catch {
             rows = await host.query(`${base}${tail}`);
         }
@@ -121,6 +124,24 @@ async function ownerNames(host: Host, ids: readonly string[]): Promise<Map<strin
     return names;
 }
 
+/** Emails of the given users (`internalemailaddress`), from a plain query; a failure only leaves them out. */
+async function ownerEmails(host: Host, ids: readonly string[]): Promise<Map<string, string>> {
+    const emails = new Map<string, string>();
+    for (let i = 0; i < ids.length; i += CHUNK) {
+        try {
+            const filter = ids.slice(i, i + CHUNK).map(id => `systemuserid eq ${id}`).join(' or ');
+            const rows = await host.query(`systemusers?$select=systemuserid,internalemailaddress&$filter=${filter}`);
+            for (const r of rows) {
+                const id = str(r['systemuserid']).toLowerCase();
+                if (GUID.test(id) && str(r['internalemailaddress']) !== '') emails.set(id, str(r['internalemailaddress']));
+            }
+        } catch {
+            // emails are a convenience
+        }
+    }
+    return emails;
+}
+
 export async function loadSnapshotInput(host: Host, solution: SolutionInfo): Promise<Result<SnapshotInput>> {
     if (!GUID.test(solution.id)) return { ok: false, error: 'Invalid solution id.' };
     try {
@@ -138,7 +159,8 @@ export async function loadSnapshotInput(host: Host, solution: SolutionInfo): Pro
         );
         const found = refRows.map(toReference).filter(r => GUID.test(r.id));
         const names = await ownerNames(host, [...new Set(found.map(r => r.ownerId).filter(id => GUID.test(id)))]);
-        const references = found.map(r => ({ ...r, ownerName: names.get(r.ownerId) ?? '' }));
+        const emails = await ownerEmails(host, [...new Set(found.map(r => r.ownerId).filter(id => GUID.test(id)))]);
+        const references = found.map(r => ({ ...r, ownerName: names.get(r.ownerId) ?? '', ownerEmail: emails.get(r.ownerId) ?? '' }));
         const memberReferenceIds = references.filter(r => memberSet.has(r.id.toLowerCase())).map(r => r.id);
 
         // Flows: members of type workflow, read in chunks so the URL stays short; category 5 keeps modern flows only.
@@ -407,3 +429,127 @@ function confirmed(kind: Plan['kind'], row: { newValue: string; oldValue: string
     const gone = row.oldValue.split(',').map(n => n.trim()).filter(n => n !== '' && !want.value.includes(n));
     return want.value.length === got.value.length && want.value.every(n => got.value.includes(n)) && gone.every(n => !got.value.includes(n));
 }
+
+const REFERENCE_COLUMNS = 'connectionreferenceid,connectionreferencelogicalname,connectionreferencedisplayname,connectorid,connectionid,ismanaged,_ownerid_value,_customconnectorid_value';
+
+/**
+ * The `componenttype` of a connection reference, read and never guessed (constitution T5): from the members of the
+ * solution, else from any reference of the environment as stored in a solution, else from the component definitions.
+ */
+export async function referenceComponentType(host: Host, snapshot: Snapshot): Promise<number | undefined> {
+    for (const r of snapshot.references) {
+        const t = snapshot.componentTypes[r.reference.id.toLowerCase()];
+        if (typeof t === 'number') return t;
+    }
+    try {
+        const any = snapshot.allReferences.find(r => GUID.test(r.id));
+        if (any) {
+            const rows = await host.query(`solutioncomponents?$select=componenttype&$filter=objectid eq ${any.id}`);
+            const t = rows.map(r => r['componenttype']).find((v): v is number => typeof v === 'number');
+            if (t !== undefined) return t;
+        }
+    } catch {
+        // try the next source
+    }
+    try {
+        const rows = await host.query("solutioncomponentdefinitions?$select=solutioncomponenttype&$filter=primaryentityname eq 'connectionreference'");
+        return rows.map(r => r['solutioncomponenttype']).find((v): v is number => typeof v === 'number');
+    } catch {
+        return undefined;
+    }
+}
+
+/** The connections of the environment (Power Platform API). An error value, never a throw, when they cannot be read. */
+export async function loadLiveConnections(host: Host): Promise<Result<LiveConnection[]>> {
+    try {
+        const id = await host.environmentId();
+        if (id === '') return { ok: false, error: 'the environment id could not be read' };
+        return { ok: true, value: parseConnections(await host.listConnections(id)) };
+    } catch (e) {
+        return { ok: false, error: message(e) };
+    }
+}
+
+/** A reference just created in the solution, with the component type it was added with (so Remove and Delete know it at once). */
+export interface CreatedReference {
+    readonly reference: ConnectionReferenceRow;
+    readonly componentType: number;
+}
+
+/** The visible steps of a creation, in order: each is reported when it starts. */
+export type CreateStep = 'check' | 'write' | 'readback';
+
+/** What a created reference says once it is in the solution and read back. */
+export const CREATED = 'Created, added to the solution and read back.';
+
+/**
+ * Creates a connection reference in an unmanaged solution (feature 021). The form is checked again, the name is checked
+ * against the environment, the component type is read, the row is created, added to the solution and read back. When the
+ * row exists but the rest fails, the row is deleted again; the error says what happened to it. Never throws.
+ */
+export async function createReference(host: Host, snapshot: Snapshot, form: NewReferenceForm, onStep?: (step: CreateStep) => void): Promise<Result<CreatedReference>> {
+    const step = (s: CreateStep) => {
+        try {
+            onStep?.(s);
+        } catch {
+            // a failing listener must never stop the write
+        }
+    };
+    const solution = snapshot.solution;
+    if (solution.managed) return { ok: false, error: 'A managed solution cannot be changed.' };
+    if (!GUID.test(solution.id)) return { ok: false, error: 'Invalid solution id.' };
+    const check = checkForm(snapshot, form);
+    if (!check.ok) return { ok: false, error: Object.values(check.errors)[0] ?? 'The form is not valid.' };
+    const record = newReferenceRecord(snapshot, form);
+    const logicalName = String(record['connectionreferencelogicalname']);
+    let id = '';
+    let created = false;
+    const undo = async (why: string): Promise<Result<CreatedReference>> => {
+        if (!created) return { ok: false, error: why };
+        try {
+            if (GUID.test(id)) {
+                await host.remove('connectionreference', id);
+                if (!(await rowExists(host, 'connectionreference', id))) return { ok: false, error: `${why} The reference that had just been created was deleted again; nothing was left behind.` };
+            }
+        } catch {
+            // reported below
+        }
+        return { ok: false, error: `${why} The reference ${logicalName}${GUID.test(id) ? ` (${id})` : ''} was created and could not be deleted again: delete it in the maker portal.` };
+    };
+    try {
+        step('check');
+        const taken = await host.query(`connectionreferences?$select=connectionreferenceid&$filter=connectionreferencelogicalname eq '${logicalName}'`);
+        if (taken.length > 0) return { ok: false, error: `${logicalName} already exists in this environment; nothing was created.` };
+        // a connection is asked about again now: it must still exist, for this connector, before anything is written
+        const connection = normalizeConnectionName(form.connectionId);
+        if (connection !== '') {
+            const live = await loadLiveConnections(host);
+            if (!live.ok) return { ok: false, error: `The connection could not be verified (${live.error}); nothing was created.` };
+            const verdict = verifyConnection({ status: 'ready', items: live.value, error: '' }, form.connectorId, connection);
+            if (verdict !== 'found') return { ok: false, error: verdict === 'other-connector' ? 'The connection belongs to another connector; nothing was created.' : 'The connection was not found among your connections; nothing was created.' };
+        }
+        const type = await referenceComponentType(host, snapshot);
+        if (type === undefined) return { ok: false, error: 'The component type of a connection reference could not be read, so it could not be added to the solution; nothing was created.' };
+
+        step('write');
+        id = (await host.create('connectionreference', record)).toLowerCase();
+        created = true;
+        if (!GUID.test(id)) {
+            const found = await host.query(`connectionreferences?$select=connectionreferenceid&$filter=connectionreferencelogicalname eq '${logicalName}'`);
+            id = str(found[0]?.['connectionreferenceid']).toLowerCase();
+            if (!GUID.test(id)) return await undo('The environment did not return the id of the new reference.');
+        }
+        await host.addToSolution(solution.uniqueName, id, type);
+        step('readback');
+        if (!(await isMember(host, solution.id, id))) return await undo('The reference was created but it is not in the solution.');
+        const rows = await host.query(`connectionreferences?$select=${REFERENCE_COLUMNS}&$filter=connectionreferenceid eq ${id}`);
+        const row = rows[0] ? toReference(rows[0]) : undefined;
+        if (!row || row.logicalName !== logicalName || row.connectorId !== form.connectorId || row.connectionId !== normalizeConnectionName(form.connectionId))
+            return await undo('The reference was written but what is stored is not what was asked.');
+        const names = await ownerNames(host, GUID.test(row.ownerId) ? [row.ownerId] : []);
+        return { ok: true, value: { reference: { ...row, ownerName: names.get(row.ownerId) ?? '' }, componentType: type } };
+    } catch (e) {
+        return await undo(`Could not create the reference: ${message(e)}.`);
+    }
+}
+

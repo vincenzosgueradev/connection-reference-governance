@@ -5,7 +5,11 @@ import { turnOffRows } from '../model/plans';
 import { categoriesOf, isCompatibleTarget, repointSources, type RepointGroup } from '../model/repoint';
 import { canMove, type OperationKind, type WizardStep } from '../model/workflow';
 import { DEFAULT_SORT, nextSort, type SolutionSort, type SolutionSortKey } from '../model/solutions';
-import type { Plan, RowOutcome, Snapshot, SolutionInfo } from '../types';
+import { buildSnapshotWith } from '../model/analysis';
+import { emptyForm, withChecked, withField, withPick, withSuggestion, type NewReferenceForm, type Suggestion } from '../model/newReference';
+import type { LiveConnection } from '../types';
+import type { Verdict } from '../model/liveConnections';
+import type { ConnectionReferenceRow, Plan, RowOutcome, Snapshot, SolutionInfo } from '../types';
 
 export type ViewName = 'flows' | 'references';
 export type DiffLayout = 'split' | 'unified';
@@ -83,6 +87,8 @@ export interface State {
     readonly dialogExpanded: boolean;
     /** The step of the studio of a re-point: a category each, then the summary (feature 014). */
     readonly studioStep: number;
+    /** The form of a new connection reference, open in the studio (feature 021); null when closed. */
+    readonly newReference: NewReferenceForm | null;
 }
 
 export type Action =
@@ -105,6 +111,22 @@ export type Action =
     | { type: 'closeStudio' }
     | { type: 'studioGo'; step: number }
     | { type: 'setDialogExpanded'; on: boolean }
+    | { type: 'openNewReference'; connectorId: string; seed?: string }
+    | { type: 'applySuggestion'; suggestion: Suggestion }
+    | { type: 'toggleSuggestions' }
+    | { type: 'pickConnection'; id: string }
+    | { type: 'connectionChecked'; typed: string; verdict: Verdict }
+    | { type: 'connectionsLoading' }
+    | { type: 'connectionsLoaded'; items: readonly LiveConnection[] }
+    | { type: 'connectionsFailed'; error: string }
+    | { type: 'setNewReferenceField'; field: 'displayName' | 'name' | 'description' | 'connectionId'; value: string }
+    | { type: 'reviewNewReference'; on: boolean }
+    | { type: 'toggleNewReferenceConnection'; id: string }
+    | { type: 'closeNewReference' }
+    | { type: 'newReferenceSaving' }
+    | { type: 'newReferenceStep'; step: 'check' | 'write' | 'readback' | 'done' }
+    | { type: 'newReferenceFailed'; error: string }
+    | { type: 'referenceCreated'; reference: ConnectionReferenceRow; componentType?: number }
     | { type: 'setRepoint'; from: string | readonly string[]; target: string }
     | { type: 'setGroups'; groups: readonly RepointGroup[] }
     | { type: 'setGroup'; group: RepointGroup }
@@ -159,6 +181,7 @@ export function initialState(): State {
         studio: false,
         dialogExpanded: true,
         studioStep: 0,
+        newReference: null,
     };
 }
 
@@ -210,13 +233,16 @@ function settled(s: State): State {
 
 /** The studio only exists where there is something to choose for: a loaded, unmanaged solution and a selection. */
 function studioOk(s: State): State {
-    if (!s.studio) return s;
+    if (!s.studio) return s.newReference === null ? s : { ...s, newReference: null };
     const ok = s.snapshot !== null && !s.snapshot.solution.managed && s.selected.length > 0 && s.wizard === null;
     if (!ok) return { ...s, studio: false };
     // the last step is the summary: one step per category and then that one
     const last = s.view === 'flows' ? categoriesOf(s.snapshot!, s.selected).length : 0;
     const step = Math.min(Math.max(s.studioStep, 0), last);
-    return step === s.studioStep ? s : { ...s, studioStep: step };
+    const next = step === s.studioStep ? s : { ...s, studioStep: step };
+    // the form belongs to one category: another step (or a changed selection) closes it
+    const cat = s.view === 'flows' ? categoriesOf(s.snapshot!, s.selected)[step] : undefined;
+    return next.newReference !== null && cat?.connectorId !== next.newReference.connectorId ? { ...next, newReference: null } : next;
 }
 
 export function reducer(s: State, a: Action): State {
@@ -235,7 +261,7 @@ function step(s: State, a: Action): State {
         case 'selectSolution':
             // A write in progress is never abandoned: the run owns the screen until its Result.
             if (s.wizard?.step === 'apply') return s;
-            return { ...s, solutionId: a.id, snapshot: null, selected: [], expanded: [], plan: null, wizard: null, results: null, error: '', filter: '', repointGroups: [], newConnectionId: '' };
+            return { ...s, solutionId: a.id, snapshot: null, selected: [], expanded: [], plan: null, wizard: null, results: null, error: '', filter: '', repointGroups: [], newConnectionId: '', newReference: null };
         case 'sortSolutions':
             return { ...s, solutionSort: nextSort(s.solutionSort, a.key) };
         case 'flowCountsLoaded':
@@ -286,7 +312,44 @@ function step(s: State, a: Action): State {
         case 'studioGo':
             return { ...s, studioStep: a.step };
         case 'closeStudio':
-            return { ...s, studio: false };
+            return { ...s, studio: false, newReference: null };
+        case 'openNewReference':
+            return s.studio && s.snapshot !== null && !s.snapshot.solution.managed ? { ...s, newReference: { ...emptyForm(a.connectorId, a.seed), live: { status: 'loading', items: [], error: '' } } } : s;
+        case 'setNewReferenceField':
+            return s.newReference && !s.newReference.saving ? { ...s, newReference: withField(s.newReference, a.field, a.value) } : s;
+        case 'applySuggestion':
+            return s.newReference && !s.newReference.saving ? { ...s, newReference: withSuggestion(s.newReference, a.suggestion) } : s;
+        case 'pickConnection':
+            return s.newReference && !s.newReference.saving ? { ...s, newReference: withPick(s.newReference, a.id) } : s;
+        case 'connectionChecked':
+            return s.newReference && !s.newReference.saving ? { ...s, newReference: withChecked(s.newReference, a.typed, a.verdict) } : s;
+        case 'toggleSuggestions':
+            return s.newReference ? { ...s, newReference: { ...s.newReference, suggestOpen: !s.newReference.suggestOpen } } : s;
+        case 'connectionsLoading':
+            return s.newReference && s.newReference.live.status !== 'loading' ? { ...s, newReference: { ...s.newReference, live: { ...s.newReference.live, status: 'loading', error: '' } } } : s;
+        case 'connectionsLoaded':
+            return s.newReference ? { ...s, newReference: { ...s.newReference, live: { status: 'ready', items: a.items, error: '' } } } : s;
+        case 'connectionsFailed':
+            return s.newReference ? { ...s, newReference: { ...s.newReference, live: { status: 'unavailable', items: [], error: a.error } } } : s;
+        case 'toggleNewReferenceConnection':
+            return s.newReference ? { ...s, newReference: { ...s.newReference, openConnections: s.newReference.openConnections.includes(a.id) ? s.newReference.openConnections.filter(x => x !== a.id) : [...s.newReference.openConnections, a.id] } } : s;
+        case 'reviewNewReference':
+            return s.newReference && !s.newReference.saving ? { ...s, newReference: { ...s.newReference, reviewing: a.on, error: '' } } : s;
+        case 'closeNewReference':
+            return s.newReference?.saving ? s : { ...s, newReference: null };
+        case 'newReferenceSaving':
+            return s.newReference && s.newReference.reviewing ? { ...s, newReference: { ...s.newReference, saving: true, step: 'check', error: '' } } : s;
+        case 'newReferenceStep':
+            return s.newReference && s.newReference.saving ? { ...s, newReference: { ...s.newReference, step: a.step } } : s;
+        case 'newReferenceFailed':
+            return s.newReference ? { ...s, newReference: { ...s.newReference, saving: false, step: '', reviewing: false, error: a.error } } : s;
+        case 'referenceCreated': {
+            if (!s.snapshot) return s;
+            const snapshot = buildSnapshotWith(s.snapshot, a.reference, a.componentType);
+            // the new reference becomes the one to use instead in its category (kept only if the planner would accept it)
+            const groups = s.repointGroups.map(g => (g.connectorId === a.reference.connectorId ? { ...g, target: a.reference.logicalName } : g));
+            return { ...s, snapshot, repointGroups: groups, newReference: null };
+        }
         case 'setDialogExpanded':
             return { ...s, dialogExpanded: a.on };
         case 'openPlan':

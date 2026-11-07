@@ -54,3 +54,12 @@ export function ownersFound(input: SnapshotInput): string[] {
     for (const c of Object.values(input.connections)) set.add(c.ownerName);
     return [...set].sort();
 }
+
+/** The snapshot with a reference just created in the solution added: member, used by no flow yet (feature 021). */
+export function buildSnapshotWith(snapshot: Snapshot, reference: ConnectionReferenceRow, componentType?: number): Snapshot {
+    if (snapshot.allReferences.some(r => r.id === reference.id)) return snapshot;
+    const flags = referenceFlags(reference, { connections: {} } as unknown as SnapshotInput, '');
+    // a member's component type is what Remove and Delete send; without it the new row would be blocked until a refresh (T2b, T5)
+    const componentTypes = componentType === undefined ? snapshot.componentTypes : { ...snapshot.componentTypes, [reference.id.toLowerCase()]: componentType };
+    return { ...snapshot, componentTypes, allReferences: [...snapshot.allReferences, reference], references: [...snapshot.references, { reference, flowIds: [], flags }] };
+}

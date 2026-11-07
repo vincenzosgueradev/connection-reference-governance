@@ -411,7 +411,7 @@ describe('the two actions in the bar', () => {
     function bar(managed = false) {
         const sol = solution(managed);
         const store = createStore(initialState());
-        const h = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
+        const h = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), createReference: vi.fn(), openNewReference: vi.fn(), refreshConnections: vi.fn(), checkConnection: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
         const root = document.createElement('div');
         document.body.append(root);
         mountMain(root, store, h, () => 'Test');
@@ -463,7 +463,7 @@ describe('the flows view', () => {
         const store = createStore(initialState());
         const root = document.createElement('div');
         document.body.append(root);
-        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
+        mountMain(root, store, { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), createReference: vi.fn(), openNewReference: vi.fn(), refreshConnections: vi.fn(), checkConnection: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() }, () => '');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });
         store.dispatch({ type: 'snapshotLoaded', snapshot: buildSnapshot(input({ solution: sol })) });

@@ -8,7 +8,7 @@ export const OTHER_USER = '22222222-2222-4222-8222-222222222222';
 
 export const guid = (n: number): string => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-export const solution = (managed = false): SolutionInfo => ({ id: guid(900), name: 'Sample', uniqueName: 'sample', managed, version: '1.0.0.0', publisher: 'Pub', createdOn: '2026-01-01T00:00:00Z' });
+export const solution = (managed = false): SolutionInfo => ({ id: guid(900), name: 'Sample', uniqueName: 'sample', managed, version: '1.0.0.0', publisher: 'Pub', prefix: 'sample', createdOn: '2026-01-01T00:00:00Z' });
 
 export const ref = (n: number, over: Partial<ConnectionReferenceRow> = {}): ConnectionReferenceRow => ({
     id: guid(n),
@@ -84,6 +84,10 @@ export function fakeHost(answer: (q: string) => Record_[], failUpdate: (id: stri
             if (err) throw new Error(err);
             h.updates.push({ entity, id, record });
         },
+        async environmentId() { return 'env-1'; },
+        async listConnections() { return { value: [] }; },
+        async create() { return ''; },
+        async addToSolution() {},
         async remove() {},
         async dependencies() { return []; },
         async removeFromSolution() {},
@@ -136,6 +140,10 @@ export function memoryHost(initial: Record<string, Record<string, string>>, opts
             h.updates.push({ entity, id, record });
             if (opts.persist !== false) rows.set(id, { ...rows.get(id), ...(opts.store ? opts.store(record as Record<string, string>) : (record as Record<string, string>)) });
         },
+        async environmentId() { return 'env-1'; },
+        async listConnections() { return { value: [] }; },
+        async create() { return ''; },
+        async addToSolution() {},
         async remove() {},
         async dependencies() { return []; },
         async removeFromSolution() {},

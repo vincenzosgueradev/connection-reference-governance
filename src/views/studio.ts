@@ -8,6 +8,7 @@ import { categoriesOf, repointTargets, stepStatus, type RepointSource, type Step
 import { button, check, chip, el, figures, icon, modal } from '../ui/components';
 import { connectorTile } from './connections';
 import { makeExpandable } from './expand';
+import { newReferencePanel, resetPanelMotion } from './newReference';
 import type { Handlers } from './main';
 
 /**
@@ -94,7 +95,7 @@ interface Parts { main: HTMLElement[]; foot?: HTMLElement; impact: HTMLElement; 
 
 const STATE_WORD: Record<StepStatus, string> = { done: 'Done', incomplete: 'Incomplete', empty: 'Not changed' };
 
-function repointParts(s: State, store: Store, snap: Snapshot): Parts {
+function repointParts(s: State, store: Store, snap: Snapshot, h: Handlers): Parts {
     const cats = categoriesOf(snap, s.selected);
     const last = cats.length; // the summary
     const step = Math.min(Math.max(s.studioStep, 0), last);
@@ -156,6 +157,9 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
         }
 
         const right = pane('to', 'Reference to use instead', 'Only references of this connector in this solution.');
+        const add = button('New reference', 'secondary', () => void h.openNewReference(cat.connectorId), true);
+        add.prepend(icon('plus', 'icon--sm'));
+        right.head.append(add);
         if (chosen.length === 0) right.body.append(note('Tick the references to replace first, or go to another category to leave this one as it is.'));
         else {
             const targets = repointTargets(snap, chosen);
@@ -214,7 +218,7 @@ function repointParts(s: State, store: Store, snap: Snapshot): Parts {
     const nothing = plan !== null && writableRows(plan).length === 0;
     // a flow that is on is not a reason to keep Review changes closed: the permission to turn it off is asked in the confirmation
     const notice = !nothing ? '' : 'No selected flow can be written with these choices.';
-    return { main: [top, panel], foot: nav, impact, ready: complete && !nothing, missing, notice };
+    return { main: [top, panel], foot: nav, impact, ready: complete && !nothing && s.newReference === null, missing, notice };
 }
 
 function connectionParts(s: State, store: Store, snap: Snapshot): Parts {
@@ -261,7 +265,7 @@ function connectionParts(s: State, store: Store, snap: Snapshot): Parts {
 export function studioDialog(s: State, store: Store, h: Handlers, environment: string): HTMLElement {
     const snap = s.snapshot!;
     const repoint = s.view === 'flows';
-    const parts = repoint ? repointParts(s, store, snap) : connectionParts(s, store, snap);
+    const parts = repoint ? repointParts(s, store, snap, h) : connectionParts(s, store, snap);
     const close = () => store.dispatch({ type: 'closeStudio' });
 
     const impact = el('div', 'studio-impact');
@@ -283,7 +287,11 @@ export function studioDialog(s: State, store: Store, h: Handlers, environment: s
         body: [...parts.main, bottom],
         ...(parts.foot ? { footNote: parts.foot } : {}),
         confirm: { label: 'Review changes', icon: 'eye', disabled: !parts.ready || s.busy, onConfirm: repoint ? h.previewRepoint : h.previewConnection },
-        onCancel: close,
+        // Escape goes to the side panel first while it is open (and is ignored while it writes)
+        onCancel: () => {
+            if (s.newReference === null) return close();
+            overlay.querySelector<HTMLButtonElement>('.newref-close')?.click(); // the same animated way out; disabled while writing
+        },
     });
 
     const box = overlay.querySelector<HTMLElement>('.modal')!;
@@ -291,10 +299,15 @@ export function studioDialog(s: State, store: Store, h: Handlers, environment: s
     overlay.classList.add('studio-overlay');
     makeExpandable(overlay, s.dialogExpanded, on => store.dispatch({ type: 'setDialogExpanded', on }));
 
+    // the side panel of a new reference slides in over the dialog (feature 021)
+    const form = repoint && s.newReference !== null ? s.newReference : null;
+    if (form) box.append(newReferencePanel(snap, store, h, form, environment));
+    else resetPanelMotion();
+
     // focus starts on the first control, not on Cancel
     const cancel = box.querySelector<HTMLElement>('[data-autofocus]');
     if (cancel) delete cancel.dataset['autofocus'];
     const first = box.querySelector<HTMLElement>('.studio .check:not(:disabled), .studio .choice:not(:disabled), .studio input:not(:disabled)');
-    (first ?? cancel)?.setAttribute('data-autofocus', 'true');
+    if (!form) (first ?? cancel)?.setAttribute('data-autofocus', 'true');
     return overlay;
 }

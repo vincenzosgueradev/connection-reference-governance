@@ -27,6 +27,14 @@ export interface Handlers {
     setManageState(on: boolean): void;
     previewRemove(): void;
     previewDelete(): void | Promise<void>;
+    /** Writes the reviewed new connection reference (feature 021). */
+    createReference(): void | Promise<void>;
+    /** Opens the side panel of a new reference for a connector and reads the connections of the environment. */
+    openNewReference(connectorId: string): void | Promise<void>;
+    /** Reads the connections of the environment again (the Refresh and Check buttons of the panel). */
+    refreshConnections(): void | Promise<void>;
+    /** Looks the typed connection id up among the connections (Enter in the field, or the search icon). */
+    checkConnection(): void | Promise<void>;
     /** What was pasted to unlock Delete. */
     setTypedCode(value: string): void;
     confirm(): void;
@@ -349,6 +357,9 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const stepTop = root.querySelector<HTMLElement>('.step-body')?.scrollTop ?? 0;
         const reopened = root.querySelector('.modal') !== null;
         const paneTops = [...root.querySelectorAll<HTMLElement>('.studio-pane-body')].map(p => p.scrollTop);
+        const panelBody = root.querySelector<HTMLElement>('.newref-body');
+        const panelTop = panelBody?.scrollTop ?? 0;
+        const panelStep = panelBody?.dataset['step'] ?? '';
         const active = document.activeElement as HTMLInputElement | null;
         const label = active && root.contains(active) ? active.getAttribute('aria-label') : null;
         const start = label !== null && typeof active!.selectionStart === 'number' ? active!.selectionStart : null;
@@ -364,12 +375,15 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         // a re-draw of an open studio is not an opening: no animation, and the lists stay where they were
         if (reopened) root.querySelector('.modal-overlay')?.classList.add('no-anim');
         root.querySelectorAll<HTMLElement>('.studio-pane-body').forEach((p, i) => { p.scrollTop = paneTops[i] ?? 0; });
+        // the side panel of a new reference keeps its place on a click or on typing; another step opens at the top (feature 021)
+        const newBody = root.querySelector<HTMLElement>('.newref-body');
+        if (newBody && panelBody && newBody.dataset['step'] === panelStep) newBody.scrollTop = panelTop;
         const dialog = root.querySelector<HTMLElement>('.modal');
         if (dialog && !dialog.contains(document.activeElement) && label === null) dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
         if (label === null) return;
         const next = [...root.querySelectorAll<HTMLElement>('[aria-label]')].find(e => e.getAttribute('aria-label') === label);
         if (!next || (next as HTMLInputElement).disabled) return;
-        next.focus();
+        next.focus({ preventScroll: true });
         try {
             if (start !== null && end !== null) (next as HTMLInputElement).setSelectionRange(start, end);
         } catch {

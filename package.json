@@ -53,6 +53,7 @@
     },
     "features": {
         "connections": 1,
-        "minAPI": "1.2.7"
+        "minAPI": "1.2.7",
+        "enabledForPowerPlatformAPI": true
     }
 }
