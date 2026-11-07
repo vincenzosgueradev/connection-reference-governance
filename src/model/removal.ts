@@ -17,7 +17,7 @@ function referenceRecord(r: ConnectionReferenceRow): string {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-export function planRemoval(snapshot: Snapshot, ids: readonly string[], kind: RemovalKind, deps?: Dependencies): Plan {
+export function planRemoval(snapshot: Snapshot, ids: readonly string[], kind: RemovalKind, deps?: Dependencies, labels?: Readonly<Record<string, string>>): Plan {
     const chosen = new Set(ids);
     const rows: PlanRow[] = [];
     // A selected row that is blocked stays: it does not make what it depends on free to go.
@@ -41,7 +41,7 @@ export function planRemoval(snapshot: Snapshot, ids: readonly string[], kind: Re
         if (found === undefined) return 'The dependencies could not be checked, so nothing is deleted.';
         const outside = found.filter(d => !going(d.id));
         if (outside.length === 0) return undefined;
-        const nameOf = (d: { id: string; type: number }) => snapshot.flows.find(f => f.flow.id === d.id)?.flow.name ?? snapshot.references.find(r => r.reference.id === d.id)?.reference.displayName ?? `a component of type ${d.type}`;
+        const nameOf = (d: { id: string; type: number }) => labels?.[d.id] ?? snapshot.flows.find(f => f.flow.id === d.id)?.flow.name ?? snapshot.references.find(r => r.reference.id === d.id)?.reference.displayName ?? `a component of type ${d.type}`;
         const names = [...new Set(outside.map(nameOf))];
         return `Other components depend on it (${names.slice(0, 3).join(', ')}${names.length > 3 ? ` and ${names.length - 3} more` : ''}): it cannot be deleted.`;
     };

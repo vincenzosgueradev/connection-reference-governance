@@ -227,19 +227,26 @@ describe('pasting a connection id and checking it', () => {
         expect(card(a, 'conn-free').classList.contains('is-on')).toBe(true);
         expect(inPanel(a, 'Review')!.disabled).toBe(false);
     });
-    it('the search icon never disables itself (so it keeps the focus) and a second press while reading is ignored', async () => {
-        const a = await app();
-        await open(a);
-        paste(a, 'conn-free');
-        const icon = byLabel(a.root, 'Check connection');
-        icon.click();
-        expect(byLabel(a.root, 'Check connection').disabled).toBe(false); // reading, and still enabled
-        expect(byLabel(a.root, 'Check connection').getAttribute('aria-busy')).toBe('true');
-        byLabel(a.root, 'Check connection').click(); // ignored: a read is running
-        byLabel(a.root, 'Refresh connections').click();
+    it('while it reads, the search icon shows it is busy and every button of the panel is disabled; a second press is ignored', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>(r => { release = r; });
+        const a = await app({ beforeConnections: () => gate });
+        a.store.dispatch({ type: 'selectAll', ids: [guid(10), guid(11), guid(12)] });
+        buttonByText(a.root, 'Choose changes...')!.click();
+        byLabel(a.root, 'Replace Ref 1').click();
+        buttonByText(a.root, 'New reference')!.click(); // the panel opens reading the connections
+        await settle();
+        expect((qa(panel(a)!, 'button') as HTMLButtonElement[]).filter(b => !b.disabled)).toEqual([]);
+        release();
         await a.controller.idle();
         await settle();
-        expect(a.calls.connectionReads).toBe(2); // one for opening, one for the search
+        paste(a, 'conn-free');
+        const lens = byLabel(a.root, 'Check connection');
+        expect(lens.disabled).toBe(false);
+        lens.click(); // at rest the lens works: it reads the connections again
+        await a.controller.idle();
+        await settle();
+        expect(a.calls.connectionReads).toBe(2); // opening the panel, and the search
     });
     it('the search keeps the scroll of the panel and never hands the focus to the first field', async () => {
         const a = await app();
@@ -437,6 +444,22 @@ describe('creating from the panel', () => {
         await create(a);
         expect(a.refs.some(r => r.logicalName === 'sample_BrandNew')).toBe(false);
         expect(a.store.get().newReference!.error).toContain('deleted again');
+    });
+    it('while the row is written every button of the panel is disabled, and Created ends the lock', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>(r => { release = r; });
+        const a = await app({ beforeCreate: () => gate });
+        await open(a);
+        type(a, 'Display name', 'Brand New');
+        inPanel(a, 'Review')!.click();
+        inPanel(a, 'Create in Sample')!.click();
+        await settle();
+        expect((qa(a.root, '.modal button') as HTMLButtonElement[]).filter(b => !b.disabled).map(b => b.textContent!.trim())).toEqual([]);
+        expect(inPanel(a, 'Creating...')!.getAttribute('aria-busy')).toBe('true');
+        release();
+        await a.controller.idle();
+        await settle();
+        expect(a.root.classList.contains('is-running')).toBe(false);
     });
     it('cannot be closed while the row is being written', async () => {
         const a = await app();

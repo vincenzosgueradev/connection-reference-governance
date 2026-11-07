@@ -164,7 +164,7 @@ describe('many items and big definitions', () => {
         const root = document.createElement('div');
         document.body.innerHTML = '';
         document.body.append(root);
-        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, previewRemove: () => undefined, previewDelete: () => undefined, createReference: () => undefined, openNewReference: () => undefined, refreshConnections: () => undefined, checkConnection: () => undefined, setTypedCode: () => undefined, setManageState: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
+        const h: Handlers = { selectSolution: () => undefined, refresh: () => undefined, previewConnection: () => undefined, previewRepoint: () => undefined, previewRemove: () => undefined, previewDelete: () => undefined, createReference: () => undefined, openNewReference: () => undefined, refreshConnections: () => undefined, checkConnection: () => undefined, cleanupRemove: () => undefined, cleanupDelete: () => undefined, startMerge: () => undefined, checkDependencies: () => undefined, setTypedCode: () => undefined, setManageState: () => undefined, confirm: () => undefined, saveBackup: () => undefined, saveReport: () => undefined };
         mountMain(root, store, h, () => 'Env');
         store.dispatch({ type: 'solutionsLoaded', solutions: [sol] });
         store.dispatch({ type: 'selectSolution', id: sol.id });

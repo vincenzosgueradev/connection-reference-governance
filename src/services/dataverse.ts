@@ -104,7 +104,7 @@ function toReference(r: Record_): ConnectionReferenceRow {
  * Names of the users and teams that own references, from plain queries (no custom request headers).
  * A failure here only leaves names empty: the owner id is still known and nothing is hidden.
  */
-async function ownerNames(host: Host, ids: readonly string[]): Promise<Map<string, string>> {
+export async function ownerNames(host: Host, ids: readonly string[]): Promise<Map<string, string>> {
     const names = new Map<string, string>();
     const sources: readonly [string, string, string][] = [['systemusers', 'systemuserid', 'fullname'], ['teams', 'teamid', 'name']];
     for (let i = 0; i < ids.length; i += CHUNK) {

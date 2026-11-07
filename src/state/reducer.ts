@@ -6,6 +6,8 @@ import { categoriesOf, isCompatibleTarget, repointSources, type RepointGroup } f
 import { canMove, type OperationKind, type WizardStep } from '../model/workflow';
 import { DEFAULT_SORT, nextSort, type SolutionSort, type SolutionSortKey } from '../model/solutions';
 import { buildSnapshotWith } from '../model/analysis';
+import type { DependencyReport, DependencyState } from '../model/dependencies';
+import { cleanupFigures, emptyCleanup, pruneCleanup, type Cleanup, type CleanupTab } from '../model/cleanup';
 import { emptyForm, withChecked, withField, withPick, withSuggestion, type NewReferenceForm, type Suggestion } from '../model/newReference';
 import type { LiveConnection } from '../types';
 import type { Verdict } from '../model/liveConnections';
@@ -89,6 +91,14 @@ export interface State {
     readonly studioStep: number;
     /** The form of a new connection reference, open in the studio (feature 021); null when closed. */
     readonly newReference: NewReferenceForm | null;
+    /** The clean up dialog (feature 022); null when closed. */
+    readonly cleanup: Cleanup | null;
+    /** What depends on each reference in the whole environment, by reference id (feature 023); dropped when the solution is read again. */
+    readonly dependencies: Readonly<Record<string, DependencyState>>;
+    /** While a merge of duplicates is being re-pointed: the duplicates to offer for removal afterwards (feature 022). */
+    readonly cleanupFollowUp: { readonly ids: readonly string[]; readonly keeper: string } | null;
+    /** A Remove or a Delete was started from the clean up dialog: it opens again after the Result (feature 022). */
+    readonly cleanupResume: boolean;
 }
 
 export type Action =
@@ -111,6 +121,19 @@ export type Action =
     | { type: 'closeStudio' }
     | { type: 'studioGo'; step: number }
     | { type: 'setDialogExpanded'; on: boolean }
+    | { type: 'dependenciesLoading'; ids: readonly string[] }
+    | { type: 'dependenciesLoaded'; id: string; report: DependencyReport }
+    | { type: 'dependenciesFailed'; id: string; error: string }
+    | { type: 'openCleanup'; tab?: CleanupTab; picked?: readonly string[] }
+    | { type: 'closeCleanup' }
+    | { type: 'setCleanupTab'; tab: CleanupTab }
+    | { type: 'toggleCleanupUnused'; id: string }
+    | { type: 'setCleanupUnused'; ids: readonly string[] }
+    | { type: 'setKeeper'; group: string; id: string }
+    | { type: 'toggleCleanupDeps'; id: string }
+    | { type: 'dismissCleanupSummary' }
+    | { type: 'startMerge'; flowIds: readonly string[]; group: RepointGroup; followUp: { readonly ids: readonly string[]; readonly keeper: string } }
+    | { type: 'followUpCleanup' }
     | { type: 'openNewReference'; connectorId: string; seed?: string }
     | { type: 'applySuggestion'; suggestion: Suggestion }
     | { type: 'toggleSuggestions' }
@@ -182,6 +205,10 @@ export function initialState(): State {
         dialogExpanded: true,
         studioStep: 0,
         newReference: null,
+        cleanup: null,
+        cleanupFollowUp: null,
+        cleanupResume: false,
+        dependencies: {},
     };
 }
 
@@ -245,8 +272,22 @@ function studioOk(s: State): State {
     return next.newReference !== null && cat?.connectorId !== next.newReference.connectorId ? { ...next, newReference: null } : next;
 }
 
+/**
+ * The clean up dialog only exists where it can be used: a loaded unmanaged solution, the references view, no change being
+ * previewed. Its ticks and keepers are checked against the solution as it is now.
+ */
+function cleanupOk(s: State): State {
+    if (!s.cleanup) return s;
+    // it stays behind the confirmation of a Remove or a Delete (the plan is previewed over it); any other step closes it
+    const behind = s.wizard !== null && s.wizard.step === 'preview' && s.plan !== null && (s.plan.kind === 'remove' || s.plan.kind === 'delete');
+    const ok = s.snapshot !== null && !s.snapshot.solution.managed && s.view === 'references' && (s.wizard === null || behind);
+    if (!ok) return { ...s, cleanup: null };
+    const next = pruneCleanup(s.snapshot!, s.cleanup);
+    return next === s.cleanup ? s : { ...s, cleanup: next };
+}
+
 export function reducer(s: State, a: Action): State {
-    return studioOk(settled(compatible(step(s, a))));
+    return cleanupOk(studioOk(settled(compatible(step(s, a)))));
 }
 
 function step(s: State, a: Action): State {
@@ -261,7 +302,7 @@ function step(s: State, a: Action): State {
         case 'selectSolution':
             // A write in progress is never abandoned: the run owns the screen until its Result.
             if (s.wizard?.step === 'apply') return s;
-            return { ...s, solutionId: a.id, snapshot: null, selected: [], expanded: [], plan: null, wizard: null, results: null, error: '', filter: '', repointGroups: [], newConnectionId: '', newReference: null };
+            return { ...s, solutionId: a.id, snapshot: null, selected: [], expanded: [], plan: null, wizard: null, results: null, error: '', filter: '', repointGroups: [], newConnectionId: '', newReference: null, cleanup: null, cleanupFollowUp: null, cleanupResume: false, dependencies: {} };
         case 'sortSolutions':
             return { ...s, solutionSort: nextSort(s.solutionSort, a.key) };
         case 'flowCountsLoaded':
@@ -276,6 +317,7 @@ function step(s: State, a: Action): State {
             return {
                 ...s,
                 snapshot: a.snapshot,
+                dependencies: {},
                 selected: s.selected.filter(id => exists(a.snapshot, id)),
                 expanded: s.expanded.filter(id => exists(a.snapshot, id)),
                 plan: stale ? s.plan : null,
@@ -285,7 +327,7 @@ function step(s: State, a: Action): State {
             };
         }
         case 'setView':
-            return { ...s, view: a.view, selected: [], expanded: [], plan: null, wizard: null };
+            return { ...s, view: a.view, selected: [], expanded: [], plan: null, wizard: null, cleanupFollowUp: null };
         case 'setFilter':
             return { ...s, filter: a.filter };
         case 'toggle':
@@ -306,6 +348,40 @@ function step(s: State, a: Action): State {
             const has = s.repointGroups.some(g => g.connectorId === a.group.connectorId);
             const next = has ? s.repointGroups.map(g => (g.connectorId === a.group.connectorId ? a.group : g)) : [...s.repointGroups, a.group];
             return { ...s, repointGroups: next.filter(g => g.from.length > 0) };
+        }
+        case 'dismissCleanupSummary':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, summaryHidden: true } } : s;
+        case 'dependenciesLoading':
+            return { ...s, cleanup: s.cleanup && s.cleanup.summaryHidden ? { ...s.cleanup, summaryHidden: false } : s.cleanup, dependencies: { ...s.dependencies, ...Object.fromEntries(a.ids.map(id => [id, { status: 'loading' } as DependencyState])) } };
+        case 'dependenciesLoaded':
+            return { ...s, dependencies: { ...s.dependencies, [a.id]: { status: 'ready', report: a.report } } };
+        case 'dependenciesFailed':
+            return { ...s, dependencies: { ...s.dependencies, [a.id]: { status: 'failed', error: a.error } } };
+        case 'openCleanup': {
+            if (s.snapshot === null || s.snapshot.solution.managed || s.view !== 'references' || s.wizard !== null) return s;
+            const f = cleanupFigures(s.snapshot);
+            const tab = a.tab ?? (f.unused === 0 && f.groups > 0 ? 'duplicates' : 'unused');
+            return { ...s, studio: false, cleanup: emptyCleanup(tab, a.picked ?? []) };
+        }
+        case 'closeCleanup':
+            return { ...s, cleanup: null, cleanupResume: false };
+        case 'setCleanupTab':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, tab: a.tab } } : s;
+        case 'toggleCleanupUnused':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, picked: s.cleanup.picked.includes(a.id) ? s.cleanup.picked.filter(x => x !== a.id) : [...s.cleanup.picked, a.id] } } : s;
+        case 'setCleanupUnused':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, picked: [...new Set(a.ids)] } } : s;
+        case 'toggleCleanupDeps':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, open: s.cleanup.open.includes(a.id) ? s.cleanup.open.filter(x => x !== a.id) : [...s.cleanup.open, a.id] } } : s;
+        case 'setKeeper':
+            return s.cleanup ? { ...s, cleanup: { ...s.cleanup, keepers: { ...s.cleanup.keepers, [a.group]: a.id } } } : s;
+        case 'startMerge':
+            // The merge is a re-point of those flows to the keeper (feature 013), chosen already; its Preview comes next.
+            return { ...s, view: 'flows', selected: [...a.flowIds], expanded: [], filter: '', plan: null, wizard: null, results: null, studio: false, cleanup: null, cleanupResume: false, repointGroups: [a.group], cleanupFollowUp: a.followUp };
+        case 'followUpCleanup': {
+            // After the merge: the duplicates are offered for removal, ticked where they are unused now (the rest is dropped).
+            const ids = s.cleanupFollowUp?.ids ?? [];
+            return { ...s, view: 'references', selected: [], expanded: [], plan: null, wizard: null, results: null, repointGroups: [], cleanupFollowUp: null, cleanupResume: false, cleanup: emptyCleanup('unused', ids) };
         }
         case 'openStudio':
             return { ...s, studio: true, studioStep: 0 };
@@ -353,7 +429,7 @@ function step(s: State, a: Action): State {
         case 'setDialogExpanded':
             return { ...s, dialogExpanded: a.on };
         case 'openPlan':
-            return { ...s, studio: false, plan: a.plan, wizard: freshWizard(a.plan.kind), planAck: false, stateAck: false, backupSaved: false, confirmCode: a.code ?? '', typedCode: '' };
+            return { ...s, studio: false, cleanupResume: s.cleanup !== null && (a.plan.kind === 'remove' || a.plan.kind === 'delete'), plan: a.plan, wizard: freshWizard(a.plan.kind), planAck: false, stateAck: false, backupSaved: false, confirmCode: a.code ?? '', typedCode: '' };
         case 'replacePlan':
             // The same preview with another reading of the same choices (the permission changed): what was ticked no longer applies.
             return s.wizard && s.wizard.step === 'preview' ? { ...s, plan: a.plan, planAck: false, stateAck: false, backupSaved: false } : s;
@@ -371,7 +447,7 @@ function step(s: State, a: Action): State {
             return s.plan ? { ...s, backupSaved: true } : s;
         case 'closePlan':
             // Leaving is only possible while nothing has been written: not during Apply, not from the Result.
-            return s.wizard && canMove(s.wizard.step, 'leave') && s.wizard.step !== 'result' ? { ...s, plan: null, wizard: null } : s;
+            return s.wizard && canMove(s.wizard.step, 'leave') && s.wizard.step !== 'result' ? { ...s, plan: null, wizard: null, cleanupFollowUp: null, cleanupResume: false, selected: s.cleanup ? [] : s.selected } : s;
         case 'setLayout':
             return s.wizard ? { ...s, wizard: { ...s.wizard, layout: a.layout } } : s;
         case 'setTab':
@@ -405,7 +481,11 @@ function step(s: State, a: Action): State {
                 ? { ...s, results: a.results, plan: null, busy: false, wizard: { ...s.wizard, step: 'result', phase: 'done', confirmOpen: false, now: a.now ?? s.wizard.now, finishedAt: a.now ?? s.wizard.now, refreshFailed: a.refreshFailed ?? false } }
                 : { ...s, results: a.results, plan: null, busy: false };
         case 'dismissResults':
-            return s.wizard && s.wizard.step !== 'result' ? s : { ...s, results: null, wizard: null };
+            if (s.wizard && s.wizard.step !== 'result') return s;
+            // a Remove or a Delete that came from Clean up: it opens again, read anew, on the Unused tab
+            return s.cleanupResume
+                ? { ...s, results: null, wizard: null, cleanupFollowUp: null, cleanupResume: false, selected: [], cleanup: emptyCleanup('unused', []) }
+                : { ...s, results: null, wizard: null, cleanupFollowUp: null };
     }
 }
 

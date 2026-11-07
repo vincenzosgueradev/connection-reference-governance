@@ -301,7 +301,7 @@ export function studioDialog(s: State, store: Store, h: Handlers, environment: s
 
     // the side panel of a new reference slides in over the dialog (feature 021)
     const form = repoint && s.newReference !== null ? s.newReference : null;
-    if (form) box.append(newReferencePanel(snap, store, h, form, environment));
+    if (form) box.append(newReferencePanel(snap, store, h, form, environment, s.dependencies));
     else resetPanelMotion();
 
     // focus starts on the first control, not on Cancel

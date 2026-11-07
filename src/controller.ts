@@ -6,7 +6,9 @@ import { planRemoval } from './model/removal';
 import { buildReport, reportFileName } from './model/report';
 import { operationLabel } from './model/workflow';
 import { normalizeConnectionName, verifyConnection } from './model/liveConnections';
+import { duplicateGroups, keeperOf, mergeInput } from './model/cleanup';
 import { randomSeed } from './model/newReference';
+import { loadDependencyReport, dependentLabels } from './services/dependencies';
 import { applyPlan, createReference, loadLiveConnections, loadFlowCounts, loadSnapshotInput, loadSolutions, readDependencies } from './services/dataverse';
 import { log } from './services/log';
 import type { Store } from './state/store';
@@ -89,6 +91,43 @@ export function createController(
         log(`Applied: ${results.filter(r => r.status === 'done').length} done, ${failed} failed.`, failed ? 'warning' : 'success');
     }
 
+    /** The Preview of the re-point chosen in the state (the studio's Review changes, and the start of a merge). */
+    function repointNow(): void {
+        const s = store.get();
+        if (!s.snapshot) return;
+        store.dispatch({ type: 'openPlan', plan: planRepointGroups(s.snapshot, s.selected, s.repointGroups, userId, s.manageState) });
+    }
+    /** The ticked unused references of the clean up dialog. The dialog stays open behind the confirmation that follows (feature 022). */
+    function tickedForCleanup(): readonly string[] {
+        const s = store.get();
+        const ids = s.cleanup?.picked ?? [];
+        if (!s.snapshot || ids.length === 0) return [];
+        store.dispatch({ type: 'selectAll', ids });
+        return ids;
+    }
+    /** Remove from the solution: the plan and its dialog (feature 016, 019). */
+    function removeIds(ids: readonly string[]): void {
+        const snapshot = store.get().snapshot;
+        if (!snapshot) return;
+        store.dispatch({ type: 'openPlan', plan: planRemoval(snapshot, ids, 'remove') });
+        store.dispatch({ type: 'openConfirm' });
+    }
+    /** Delete: what depends on each row is asked first; a row something depends on is never offered for deletion. */
+    async function deleteIds(ids: readonly string[]): Promise<void> {
+        const snapshot = store.get().snapshot;
+        if (!snapshot) return;
+        store.dispatch({ type: 'busy', busy: true });
+        const deps = await readDependencies(host, snapshot, ids);
+        // the components outside the selection that block it are named (feature 023): what they are and which solutions hold them
+        const blockers = new Map<string, { id: string; type: number }>();
+        for (const list of Object.values(deps)) for (const d of list ?? []) if (!ids.includes(d.id)) blockers.set(d.id, d);
+        const labels = blockers.size === 0 ? {} : await dependentLabels(host, snapshot, [...blockers.values()]);
+        store.dispatch({ type: 'busy', busy: false });
+        if (store.get().snapshot !== snapshot) return; // the user moved on while it was read
+        store.dispatch({ type: 'openPlan', plan: planRemoval(snapshot, ids, 'delete', deps, labels), code: makeCode() });
+        store.dispatch({ type: 'openConfirm' });
+    }
+
     let reading = false;
     /**
      * Reads the connections of the environment for the open panel. With `check` the typed id is then looked up in them
@@ -141,9 +180,7 @@ export function createController(
             store.dispatch({ type: 'openPlan', plan: planConnectionChange(s.snapshot, s.selected, s.newConnectionId, userId) });
         },
         previewRepoint() {
-            const s = store.get();
-            if (!s.snapshot) return;
-            store.dispatch({ type: 'openPlan', plan: planRepointGroups(s.snapshot, s.selected, s.repointGroups, userId, s.manageState) });
+            repointNow();
         },
         setManageState(on) {
             store.dispatch({ type: 'setManageState', on });
@@ -153,23 +190,62 @@ export function createController(
         },
         // Taking things away has no step to choose in: the dialog opens at once, over the list (feature 019).
         previewRemove() {
-            const s = store.get();
-            if (!s.snapshot) return;
-            store.dispatch({ type: 'openPlan', plan: planRemoval(s.snapshot, s.selected, 'remove') });
-            store.dispatch({ type: 'openConfirm' });
+            removeIds(store.get().selected);
         },
-        async previewDelete() {
+        previewDelete() {
+            return deleteIds(store.get().selected);
+        },
+        /** What depends on these references in the whole environment (feature 023): explicit, a few at a time, answers for an old solution dropped. */
+        checkDependencies(ids) {
             const s = store.get();
-            if (!s.snapshot) return;
-            const chosen = s.selected;
             const snapshot = s.snapshot;
-            store.dispatch({ type: 'busy', busy: true });
-            // what depends on each row is asked first: a row something depends on is never offered for deletion
-            const deps = await readDependencies(host, snapshot, chosen);
-            store.dispatch({ type: 'busy', busy: false });
-            if (store.get().snapshot !== snapshot) return; // the user moved on while it was read
-            store.dispatch({ type: 'openPlan', plan: planRemoval(snapshot, chosen, 'delete', deps), code: makeCode() });
-            store.dispatch({ type: 'openConfirm' });
+            if (!snapshot) return run;
+            const todo = [...new Set(ids)].filter(id => s.dependencies[id]?.status !== 'loading' && snapshot.allReferences.some(r => r.id === id));
+            if (todo.length === 0) return run;
+            store.dispatch({ type: 'dependenciesLoading', ids: todo });
+            let next = 0;
+            const worker = async (): Promise<void> => {
+                while (next < todo.length) {
+                    const id = todo[next++]!;
+                    const reference = snapshot.allReferences.find(r => r.id === id)!;
+                    const res = await loadDependencyReport(host, snapshot, reference);
+                    if (store.get().snapshot !== snapshot) return; // the solution was read again meanwhile: this answer is old
+                    store.dispatch(res.ok ? { type: 'dependenciesLoaded', id, report: res.value } : { type: 'dependenciesFailed', id, error: res.error });
+                    if (!res.ok) log(`The dependencies of ${reference.logicalName} could not be read: ${res.error}`, 'warning');
+                }
+            };
+            run = Promise.all([worker(), worker(), worker()]).then(() => undefined);
+            return run;
+        },
+        // Clean up (feature 022): the ticked references go through the very same Remove and Delete dialogs.
+        cleanupRemove() {
+            const ids = tickedForCleanup();
+            if (ids.length === 0) return;
+            removeIds(ids);
+        },
+        cleanupDelete() {
+            const ids = tickedForCleanup();
+            if (ids.length === 0) return Promise.resolve();
+            return deleteIds(ids);
+        },
+        /** Starts the re-point of a merge (two operations, two confirmations: T2); with no flow to re-point, goes to the unused list. */
+        startMerge(groupKey) {
+            const s = store.get();
+            const snapshot = s.snapshot;
+            const group = snapshot ? duplicateGroups(snapshot).find(g => g.key === groupKey) : undefined;
+            if (!snapshot || !group) return;
+            const keeper = keeperOf(group, s.cleanup);
+            const merge = mergeInput(snapshot, group, keeper);
+            if (!merge) return;
+            const ids = merge.duplicates.map(d => d.id);
+            if (merge.group === null) {
+                // no flow uses the duplicates: they are already unused, so they are only to be taken away
+                store.dispatch({ type: 'openCleanup', tab: 'unused', picked: ids });
+                return;
+            }
+            store.dispatch({ type: 'startMerge', flowIds: merge.flowIds, group: merge.group, followUp: { ids, keeper: merge.keeper.displayName || merge.keeper.logicalName } });
+            if (store.get().cleanupFollowUp === null) return;
+            repointNow();
         },
         openNewReference(connectorId) {
             store.dispatch({ type: 'openNewReference', connectorId, seed: randomSeed() });

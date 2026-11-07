@@ -6,6 +6,13 @@ All notable changes are listed here, newest first. Format: Keep a Changelog; ver
 
 ### Added
 
+- Dependencies in the whole environment: the details of a reference have Check dependencies, which lists everything that uses it in any solution (flows, agents, apps, other components) with state, owner and the solutions that hold them, marking what is outside the open solution. The same in the new-reference panel (every reference that holds a connection and the total for the connection) and in Clean up (a verdict per unused reference, Select the ones nobody uses, and the duplicates). A blocked Delete now names the components that block it. Read only, on request, from Dataverse dependency tracking.
+- A confirmation over the clean up dialog no longer flashes on every click.
+- Clean up: Remove and Delete now open their confirmation over the clean up dialog instead of taking you to the list; Cancel returns to it with your ticks, and after the Result it opens again with the list read anew.
+- While an action is running (a check, a read, a write, a creation) every button is disabled, by one rule for the whole tool; the control that is working keeps its look and shows its spinner. The list of Clean up keeps its scroll position when you click in it.
+- Clean up: Check dependencies works on the ticked references (all when none is ticked), the buttons sit on one line, the wait shows its progress in the button, and the summary is one line that can be closed.
+- The Clean up list scrolls: it was cut at the bottom of the dialog when there were many references.
+- Clean up: a dialog in the Connection references view lists the references nobody uses (with their connector, connection and tags such as Never connected or Duplicate of) and the groups of duplicates (same connector, same connection). Tick the unused ones to remove them from the solution or delete them through the usual dialogs. Merge a group of duplicates: choose the reference to keep, re-point the flows of the others to it (Preview and confirmation as always), then the Result offers the duplicates, now unused, for removal with their own preview. Managed references cannot be ticked, flows that could not be read are reported, and nothing is written by the dialog itself.
 - The fields of the new-reference panel take the full width of the panel.
 - Creating a reference now shows what is happening: the three steps (checked again, created and added, read back) light up as they are reached, the button has a spinner, a thin bar runs while it works, and "Created" is shown for a moment before the panel closes.
 - A pasted connection id is now looked up only when you press Enter or the search icon (not while typing), and pressing the icon no longer throws the panel back to the top.

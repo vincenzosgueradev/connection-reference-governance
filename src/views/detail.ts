@@ -2,7 +2,9 @@ import { TYPE_LABEL, type FlowType } from '../model/flowinfo';
 import { fullDate } from '../model/time';
 import type { FlowView, ReferenceView } from '../types';
 import { chip, dataTable, detailBlock, el, keyValues, tableWrap, type ChipKind } from '../ui/components';
+import { summarize, type DependencyState } from '../model/dependencies';
 import { connectionChip, connectorName, flagChips, referenceCell } from './connections';
+import { dependenciesBlock } from './dependencies';
 
 /** The panels that open under a row: what is known about a flow or a reference, as key-value pairs and tables. DOM only. */
 
@@ -72,7 +74,13 @@ export function flowDetail(f: FlowView): HTMLElement {
     return root;
 }
 
-export function referenceDetail(r: ReferenceView, flows: readonly FlowView[]): HTMLElement {
+/** What the details of a reference need to show its dependencies in the whole environment (feature 023). */
+export interface ReferenceDependencies {
+    readonly state: DependencyState | undefined;
+    readonly onCheck: () => void;
+}
+
+export function referenceDetail(r: ReferenceView, flows: readonly FlowView[], deps?: ReferenceDependencies): HTMLElement {
     const ref = r.reference;
     const root = el('div', 'detail');
     root.append(detailBlock('Connection reference', undefined, keyValues([
@@ -88,10 +96,15 @@ export function referenceDetail(r: ReferenceView, flows: readonly FlowView[]): H
     const users = flows.filter(f => r.flowIds.includes(f.flow.id));
     if (users.length === 0) {
         root.append(detailBlock('Used by', 0, el('p', 'muted', 'No flow of this solution uses this reference.'), true, 'workflow'));
-        return root;
+    } else {
+        const table = dataTable(['Flow', 'Type', 'State'], users, f => [el('span', 'cell-strong', f.flow.name), typeChip(f.info.type), stateChip(f.flow.stateCode)]);
+        table.classList.add('inner-table');
+        root.append(detailBlock('Used by', users.length, tableWrap(table), false, 'workflow'));
     }
-    const table = dataTable(['Flow', 'Type', 'State'], users, f => [el('span', 'cell-strong', f.flow.name), typeChip(f.info.type), stateChip(f.flow.stateCode)]);
-    table.classList.add('inner-table');
-    root.append(detailBlock('Used by', users.length, tableWrap(table), false, 'workflow'));
+    // everything that depends on it, in any solution of the environment: read on request (feature 023)
+    if (deps) {
+        const count = deps.state?.status === 'ready' ? summarize(deps.state.report).total : undefined;
+        root.append(detailBlock('Dependencies in the whole environment', count, dependenciesBlock({ state: deps.state, subject: 'this reference', onCheck: deps.onCheck, name: ref.displayName || ref.logicalName }), true, 'layers'));
+    }
     return root;
 }

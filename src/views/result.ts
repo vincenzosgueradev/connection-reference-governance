@@ -17,6 +17,8 @@ export interface ResultArgs {
 export interface ResultHandlers {
     saveReport(): void;
     back(): void;
+    /** An optional next step offered after this result (the duplicates of a merge, feature 022). */
+    followUp?: { readonly label: string; run(): void };
 }
 
 export function resultStep(a: ResultArgs, h: ResultHandlers): HTMLElement {
@@ -49,7 +51,7 @@ export function resultStep(a: ResultArgs, h: ResultHandlers): HTMLElement {
         [
             stepButton('Save report', 'secondary', 'save', h.saveReport, { title: 'A file with the outcome of every row' }),
             spacer(),
-            stepButton('Back to solution', 'primary', 'arrow-left', h.back),
+            ...(h.followUp ? [stepButton('Back to solution', 'secondary', 'arrow-left', h.back), stepButton(h.followUp.label, 'primary', 'layers', h.followUp.run, { title: 'The references that are not used any more can be removed or deleted, with their own preview' })] : [stepButton('Back to solution', 'primary', 'arrow-left', h.back)]),
         ],
     );
 }

@@ -160,3 +160,11 @@ FR-2120: A wait MUST show a spinner or a bar, never only a changed label.
 ## Amendment 2026-11-07 (hand test 6: full width)
 
 The fields of the panel stopped at 380px (the kit's cap on a text input) and cut their text while the panel had room. FR-2121: every field of the panel (display name, name, description, pasted connection id) takes the full width of the panel body.
+
+## Amendment 2026-11-07 (Used by sees the whole environment)
+
+The author: a connection must give all its dependencies, also outside the solution. In the expanded **Used by** of a connection card, each reference now has the dependencies block of feature 023 (Check dependencies: flows, agents, apps and other components of the whole environment, with their solutions, marked Outside this solution), and the connection has **Check every dependency of this connection**, which reads all of them and shows the total. The flows of the open solution listed until now stay.
+
+FR-2122: The Used by of a connection MUST be able to show every dependent of the references that hold it, in any solution.
+
+Note 2026-11-07: FR-2118 (Check and Refresh stay enabled while reading) is superseded by the global rule of constitution 1.8.1: every button is disabled while an action runs; the focus is protected by other means (see feature 022, amendment).

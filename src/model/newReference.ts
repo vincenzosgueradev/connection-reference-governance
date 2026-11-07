@@ -150,6 +150,8 @@ export function newReferenceRecord(snapshot: Snapshot, form: NewReferenceForm): 
 
 /** One reference that holds a connection, with the flows of the open solution that use it. */
 export interface ConnectionUser {
+    /** The id of the reference: what its dependencies are asked for. */
+    readonly id: string;
     readonly logicalName: string;
     readonly displayName: string;
     /** Owner of the reference row (not of the connection) and the email of that owner when it is a user. */
@@ -182,6 +184,7 @@ export function connectionChoices(snapshot: Snapshot, form: NewReferenceForm): C
             const users = snapshot.allReferences
                 .filter(r => r.connectionId.toLowerCase() === c.name.toLowerCase())
                 .map((r): ConnectionUser => ({
+                    id: r.id,
                     logicalName: r.logicalName,
                     displayName: r.displayName || r.logicalName,
                     ownerName: r.ownerName,

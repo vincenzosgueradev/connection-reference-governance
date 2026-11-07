@@ -89,6 +89,7 @@ export function fakeHost(answer: (q: string) => Record_[], failUpdate: (id: stri
         async create() { return ''; },
         async addToSolution() {},
         async remove() {},
+        async dependents() { return []; },
         async dependencies() { return []; },
         async removeFromSolution() {},
         async currentUserId() {
@@ -145,6 +146,7 @@ export function memoryHost(initial: Record<string, Record<string, string>>, opts
         async create() { return ''; },
         async addToSolution() {},
         async remove() {},
+        async dependents() { return []; },
         async dependencies() { return []; },
         async removeFromSolution() {},
         async currentUserId() {

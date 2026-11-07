@@ -13,6 +13,9 @@ import { confirmModal } from './confirm';
 import { resetStudioMotion, studioDialog } from './studio';
 import { previewStep } from './preview';
 import { resultStep } from './result';
+import { cleanupDialog } from './cleanup';
+import { actionRunning } from '../state/running';
+import { cleanupFigures } from '../model/cleanup';
 import { removalModal } from './removal';
 import { flowDetail, referenceDetail, stateChip, typeChip } from './detail';
 
@@ -33,6 +36,13 @@ export interface Handlers {
     openNewReference(connectorId: string): void | Promise<void>;
     /** Reads the connections of the environment again (the Refresh and Check buttons of the panel). */
     refreshConnections(): void | Promise<void>;
+    /** Reads what depends on these references in the whole environment, in any solution (feature 023). */
+    checkDependencies(ids: readonly string[]): void | Promise<void>;
+    /** Clean up (feature 022): remove or delete the ticked unused references through the usual dialogs. */
+    cleanupRemove(): void;
+    cleanupDelete(): void | Promise<void>;
+    /** Merges a group of duplicates: starts the re-point of their flows to the keeper (the removal follows as its own step). */
+    startMerge(groupKey: string): void;
     /** Looks the typed connection id up among the connections (Enter in the field, or the search icon). */
     checkConnection(): void | Promise<void>;
     /** What was pasted to unlock Delete. */
@@ -159,7 +169,7 @@ function flowsTable(s: State, store: Store): { table: HTMLElement; count: number
     return { table: tableWrap(t), count: shown.length };
 }
 
-function referencesTable(s: State, store: Store): { table: HTMLElement; count: number } {
+function referencesTable(s: State, store: Store, h: Handlers): { table: HTMLElement; count: number } {
     const snap = s.snapshot!;
     const shown = (snap.references as readonly ReferenceView[]).filter(r => matches(`${r.reference.displayName} ${r.reference.logicalName} ${connectorInfo(r.reference.connectorId).name} ${r.reference.ownerName}`, s.filter));
     const attention = shown.some(r => r.flags.length > 0);
@@ -171,13 +181,13 @@ function referencesTable(s: State, store: Store): { table: HTMLElement; count: n
         cells: r => {
             const ref = r.reference;
             const used = el('span', r.flowIds.length === 0 ? 'muted' : '', r.flowIds.length === 0 ? 'No flow' : r.flowIds.length === 1 ? '1 flow' : `${r.flowIds.length} flows`);
-            used.title = r.flowIds.map(id => snap.flows.find(f => f.flow.id === id)?.flow.name ?? id).join(', ');
+            used.title = r.flowIds.length === 0 ? 'No flow of this solution. Open the row and press Check dependencies to see everything that uses it in the environment.' : `Flows of this solution: ${r.flowIds.map(id => snap.flows.find(f => f.flow.id === id)?.flow.name ?? id).join(', ')}. Open the row to see what else uses it.`;
             const owner = el('span', 'cell-muted', ref.ownerName || 'Unknown');
             owner.title = 'The owner of the connection reference row, not of the connection behind it.';
             const cells = [referenceCell(ref, ref.logicalName), connectorName(ref.connectorId, ref.customConnectorId !== ''), connectionChip(ref.connectionId), owner, used];
             return attention ? [...cells, flagChips(r.flags)] : cells;
         },
-        detail: r => referenceDetail(r, snap.flows),
+        detail: r => referenceDetail(r, snap.flows, { state: s.dependencies[r.reference.id], onCheck: () => void h.checkDependencies([r.reference.id]) }),
         ...selectionHandlers(s, store),
     });
     t.classList.add('refs-table');
@@ -222,9 +232,18 @@ function actionStrip(s: State, store: Store, h: Handlers): HTMLElement {
     del.prepend(icon('trash'));
     del.disabled = off || allInUse;
     del.title = allInUse ? 'Used by flows: re-point those flows first' : 'Deletes the selected rows from the environment';
+    // Clean up (feature 022): the unused references and the duplicates, with how many there are to look at
+    const fig = cleanupFigures(snap);
+    const todo = fig.unused + fig.groups;
+    const clean = button('Clean up...', 'secondary', () => store.dispatch({ type: 'openCleanup' }));
+    clean.prepend(icon('layers'));
+    if (todo > 0) clean.append(' ', el('span', 'segment-count', String(todo)));
+    clean.setAttribute('aria-label', 'Clean up references');
+    clean.disabled = !editable || s.busy;
+    clean.title = !editable ? 'This solution is managed: it cannot be changed' : todo === 0 ? 'Nothing to clean up: every reference is used and none is a duplicate' : `${fig.unused} unused, ${fig.groups} duplicate ${fig.groups === 1 ? 'group' : 'groups'}`;
     const actions = el('div', 'action-buttons');
     // Only connection references can be taken out or deleted from here; flows are only re-pointed.
-    actions.append(...(refs ? [remove, del] : []), open);
+    actions.append(...(refs ? [clean, remove, del] : []), open);
     root.append(head, count, actions);
     return root;
 }
@@ -252,7 +271,12 @@ function wizardScreen(s: State, store: Store, h: Handlers, environment: string):
     } else if (w.step === 'apply') {
         root.append(applyStep(w, environment, s.plan?.rows ?? []));
     } else if (w.step === 'result') {
-        root.append(resultStep({ wizard: w, results: s.results ?? [], solutionName: snap.solution.name, environment }, { saveReport: h.saveReport, back: () => store.dispatch({ type: 'dismissResults' }) }));
+        root.append(resultStep({ wizard: w, results: s.results ?? [], solutionName: snap.solution.name, environment }, {
+            saveReport: h.saveReport,
+            back: () => store.dispatch({ type: 'dismissResults' }),
+            // the second step of a merge: the duplicates that are unused now are offered for removal (its own preview and confirmation)
+            ...(s.cleanupFollowUp && w.operation === 'repoint' ? { followUp: { label: `Clean up the ${s.cleanupFollowUp.ids.length === 1 ? 'duplicate' : 'duplicates'}`, run: () => store.dispatch({ type: 'followUpCleanup' }) } } : {}),
+        }));
     }
     if (w.confirmOpen && s.plan) {
         root.append(confirmModal(
@@ -283,18 +307,20 @@ function solutionDetail(s: State, store: Store, h: Handlers, environment: string
     hint.append(icon('info', 'icon--sm'), 'Click a row to see its details. The connection owner and state are not available from the connected environment: the owner shown is the owner of the reference.');
     p.body.append(hint, actionStrip(s, store, h));
 
-    const { table: listTable, count } = s.view === 'flows' ? flowsTable(s, store) : referencesTable(s, store);
+    const { table: listTable, count } = s.view === 'flows' ? flowsTable(s, store) : referencesTable(s, store, h);
     if (count === 0) {
         p.body.append(emptyState(s.filter !== '' ? `Nothing matches the filter "${s.filter}" in ${snap.solution.name}.` : s.view === 'flows' ? `${snap.solution.name} has no flows.` : `${snap.solution.name} has no connection references.`, s.filter !== '' ? 'search' : s.view === 'flows' ? 'workflow' : 'plug'));
     } else {
         p.body.append(listTable);
     }
+    // Clean up stays behind the confirmation of a Remove or a Delete: both are drawn, the confirmation last, so it is on top
+    if (s.cleanup) p.root.append(cleanupDialog(s, store, h, environment));
     if (removalDialogOpen(s)) {
         p.root.append(removalModal(
             { plan: s.plan!, snapshot: snap, environment, ack: s.planAck, backupSaved: s.backupSaved, code: s.confirmCode, typed: s.typedCode, stateAck: s.stateAck },
             { confirm: h.confirm, cancel: () => store.dispatch({ type: 'closePlan' }), saveBackup: h.saveBackup, setAck: on => store.dispatch({ type: 'setAck', on }), setTyped: h.setTypedCode, setStateAck: on => store.dispatch({ type: 'setStateAck', on }) },
         ));
-    } else if (s.studio) p.root.append(studioDialog(s, store, h, environment));
+    } else if (!s.cleanup && s.studio) p.root.append(studioDialog(s, store, h, environment));
     else resetStudioMotion();
     p.root.classList.add('screen');
     return p.root;
@@ -353,10 +379,13 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const page = root.closest<HTMLElement>('.main-content');
         const pageTop = page?.scrollTop ?? 0;
         const wrapTop = root.querySelector<HTMLElement>('.table-wrap')?.scrollTop ?? 0;
-        const modalTop = root.querySelector<HTMLElement>('.modal-body')?.scrollTop ?? 0;
+        const modalTops = [...root.querySelectorAll<HTMLElement>('.modal-body')].map(b => b.scrollTop); // one per dialog (two can be stacked)
         const stepTop = root.querySelector<HTMLElement>('.step-body')?.scrollTop ?? 0;
-        const reopened = root.querySelector('.modal') !== null;
+        const dialogsBefore = root.querySelectorAll('.modal-overlay').length; // the dialogs that were already open (two can be stacked)
         const paneTops = [...root.querySelectorAll<HTMLElement>('.studio-pane-body')].map(p => p.scrollTop);
+        const cleanBody = root.querySelector<HTMLElement>('.cleanup-content');
+        const cleanTop = cleanBody?.scrollTop ?? 0;
+        const cleanTab = cleanBody?.dataset['tab'] ?? '';
         const panelBody = root.querySelector<HTMLElement>('.newref-body');
         const panelTop = panelBody?.scrollTop ?? 0;
         const panelStep = panelBody?.dataset['step'] ?? '';
@@ -365,21 +394,29 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const start = label !== null && typeof active!.selectionStart === 'number' ? active!.selectionStart : null;
         const end = label !== null && typeof active!.selectionEnd === 'number' ? active!.selectionEnd : null;
         draw();
+        // the global rule: while an action runs every button is disabled, here, once, whatever drew it (constitution T8)
+        const running = actionRunning(store.get());
+        root.classList.toggle('is-running', running);
+        if (running) root.querySelectorAll<HTMLButtonElement>('button').forEach(b => { b.disabled = true; });
         if (page) page.scrollTop = samePage ? pageTop : 0;
         const wrap = root.querySelector<HTMLElement>('.table-wrap');
         if (wrap) wrap.scrollTop = samePage ? wrapTop : 0;
         const stepBody = root.querySelector<HTMLElement>('.step-body');
         if (stepBody) stepBody.scrollTop = samePage ? stepTop : 0;
-        const modalBody = root.querySelector<HTMLElement>('.modal-body');
-        if (modalBody) modalBody.scrollTop = modalTop;
+        root.querySelectorAll<HTMLElement>('.modal-body').forEach((b, i) => { b.scrollTop = modalTops[i] ?? 0; });
         // a re-draw of an open studio is not an opening: no animation, and the lists stay where they were
-        if (reopened) root.querySelector('.modal-overlay')?.classList.add('no-anim');
+        // a redraw is not an opening: every dialog that was already open keeps still; only one that has just opened animates
+        root.querySelectorAll('.modal-overlay').forEach((o, i) => { if (i < dialogsBefore) o.classList.add('no-anim'); });
         root.querySelectorAll<HTMLElement>('.studio-pane-body').forEach((p, i) => { p.scrollTop = paneTops[i] ?? 0; });
         // the side panel of a new reference keeps its place on a click or on typing; another step opens at the top (feature 021)
         const newBody = root.querySelector<HTMLElement>('.newref-body');
         if (newBody && panelBody && newBody.dataset['step'] === panelStep) newBody.scrollTop = panelTop;
-        const dialog = root.querySelector<HTMLElement>('.modal');
-        if (dialog && !dialog.contains(document.activeElement) && label === null) dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+        // the list of Clean up keeps its place on a click; another tab opens at the top (feature 022)
+        const newClean = root.querySelector<HTMLElement>('.cleanup-content');
+        if (newClean && cleanBody && newClean.dataset['tab'] === cleanTab) newClean.scrollTop = cleanTop;
+        const modals = root.querySelectorAll<HTMLElement>('.modal');
+        const dialog = modals.length > 0 ? modals[modals.length - 1]! : null; // the topmost one
+        if (dialog && !dialog.contains(document.activeElement) && label === null) dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
         if (label === null) return;
         const next = [...root.querySelectorAll<HTMLElement>('[aria-label]')].find(e => e.getAttribute('aria-label') === label);
         if (!next || (next as HTMLInputElement).disabled) return;

@@ -28,7 +28,7 @@ function openConfirm(store: ReturnType<typeof createStore>, plan: ReturnType<typ
 function screen() {
     const sol = solution();
     const store = createStore(initialState());
-    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), createReference: vi.fn(), openNewReference: vi.fn(), refreshConnections: vi.fn(), checkConnection: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
+    const h: Handlers = { selectSolution: vi.fn(), refresh: vi.fn(), previewConnection: vi.fn(), previewRepoint: vi.fn(), previewRemove: vi.fn(), previewDelete: vi.fn(), createReference: vi.fn(), openNewReference: vi.fn(), refreshConnections: vi.fn(), checkConnection: vi.fn(), cleanupRemove: vi.fn(), cleanupDelete: vi.fn(), startMerge: vi.fn(), checkDependencies: vi.fn(), setTypedCode: vi.fn(), setManageState: vi.fn(), confirm: vi.fn(), saveBackup: vi.fn(), saveReport: vi.fn() };
     const root = document.createElement('div');
     document.body.innerHTML = '';
     document.body.append(root);

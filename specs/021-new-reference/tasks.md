@@ -34,3 +34,4 @@
 - [x] T32 Panel: live timeline (pending, active, done), spinner in the button, indeterminate bar, Created state before closing; reduced motion
 - [x] T33 Constitution T8 (visible waits), tests, build; memory rule on the UX/UI standard
 - [x] T34 Fields at full width: the kit's 380px cap on `.text-input` is lifted for `.newref-input`; guard test
+- [x] T35 Used by shows the dependencies of every reference that holds a connection, in the whole environment, and the connection total (feature 023)

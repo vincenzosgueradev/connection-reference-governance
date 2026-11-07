@@ -16,6 +16,15 @@ import { clientData, flow, ref, solution } from './fixtures';
 export interface ScenarioOptions {
     references?: ConnectionReferenceRow[];
     flows?: FlowRow[];
+    /** What depends on a reference (RetrieveDependentComponents), by reference id. */
+    dependents?: Record<string, { id: string; type: number }[]>;
+    /** What blocks the deletion of a reference (RetrieveDependenciesForDelete), by reference id. */
+    blockers?: Record<string, { id: string; type: number }[]>;
+    /** Makes reading the dependents fail with this message; or waits before answering. */
+    failDependents?: string;
+    beforeDependents?: () => Promise<void>;
+    /** Answers a query first (the names of components outside the solution); undefined falls through to the scenario. */
+    answer?: (q: string) => Record<string, unknown>[] | undefined;
     /** The connections the Power Platform API lists; 'unavailable' makes the list fail; a function gives them per call. */
     connections?: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] | 'unavailable';
     /** Waits before the row is created / before it is added to the solution, so a test can look at the screen in the middle. */
@@ -23,6 +32,8 @@ export interface ScenarioOptions {
     beforeAdd?: () => Promise<void>;
     /** How long the "Created" state is shown before the panel closes (ms); 0 in tests unless asked. */
     celebrateMs?: number;
+    /** Waits before the connections are listed, so a test can look at the panel while it reads them. */
+    beforeConnections?: () => Promise<void>;
     /** Makes reading the environment id return nothing. */
     noEnvironmentId?: boolean;
     /** Makes the creation of a reference fail with this message. */
@@ -67,11 +78,13 @@ export function scenario(opts: ScenarioOptions = {}) {
     let wrote = false;
     const notMember = new Set<string>(); // created references until they are added to the solution
     let nextId = 500;
-    const calls = { connectionReads: 0, created: [] as Record<string, unknown>[], added: [] as { solution: string; id: string; type: number }[], queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
+    const calls = { dependentReads: [] as string[], connectionReads: 0, created: [] as Record<string, unknown>[], added: [] as { solution: string; id: string; type: number }[], queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
 
     const host: Host = {
         async query(q) {
             calls.queries.push(q);
+            const custom = opts.answer?.(q);
+            if (custom !== undefined) return custom;
             const byId = /\$select=(\w+)&\$filter=\w+ eq ([0-9a-f-]+)$/.exec(q);
             if (byId) {
                 const [, col, id] = byId;
@@ -125,6 +138,7 @@ export function scenario(opts: ScenarioOptions = {}) {
         },
         async listConnections(environmentId) {
             calls.connectionReads++;
+            await opts.beforeConnections?.();
             if (opts.connections === 'unavailable') throw new Error('The Power Platform API is not enabled for this connection.');
             expect(environmentId).toBe('env-1');
             const list: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] = opts.connections ?? defaultConnections();
@@ -149,7 +163,13 @@ export function scenario(opts: ScenarioOptions = {}) {
             const i = refs.findIndex(r => r.id === id);
             if (i >= 0) refs.splice(i, 1);
         },
-        async dependencies() { return []; },
+        async dependents(_type, id) {
+            calls.dependentReads.push(id);
+            await opts.beforeDependents?.();
+            if (opts.failDependents) throw new Error(opts.failDependents);
+            return opts.dependents?.[id] ?? [];
+        },
+        async dependencies(_type, id) { return opts.blockers?.[id] ?? []; },
         async removeFromSolution() {},
         async currentUserId() {
             return '11111111-1111-4111-8111-111111111111';

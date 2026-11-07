@@ -29,6 +29,8 @@ export interface Host {
     remove(entity: string, id: string): Promise<void>;
     /** Takes a component out of an unmanaged solution (RemoveSolutionComponent); the component itself stays in the environment. */
     removeFromSolution(solutionUniqueName: string, componentId: string, componentType: number): Promise<void>;
+    /** Every component that depends on a component, in any solution (RetrieveDependentComponents: "Used by"). Rejects when it cannot be read. */
+    dependents(componentType: number, id: string): Promise<Dependent[]>;
     /** The components that would stop a component from being deleted (RetrieveDependenciesForDelete). Rejects when it cannot be read. */
     dependencies(componentType: number, id: string): Promise<Dependent[]>;
     /** Id of the signed-in user (WhoAmI), lower case. Empty when unknown. */
@@ -87,6 +89,12 @@ export function createHost(): Host {
                 operationType: 'action',
                 parameters: { SolutionComponent: { '@odata.type': 'Microsoft.Dynamics.CRM.solutioncomponent', solutioncomponentid: componentId }, ComponentType: componentType, SolutionUniqueName: solutionUniqueName },
             });
+        },
+        async dependents(componentType, id) {
+            // Learn: RetrieveDependentComponents(ObjectId, ComponentType) lists every component that depends on this one (a GET).
+            const call = `RetrieveDependentComponents(ObjectId=${id},ComponentType=${componentType})`;
+            const res = await window.dataverseAPI.queryData(call);
+            return res.value.map(r => ({ id: String(r['dependentcomponentobjectid'] ?? '').toLowerCase(), type: Number(r['dependentcomponenttype'] ?? 0) }));
         },
         async dependencies(componentType, id) {
             // A function of the Web API, called as a plain GET; the result is the list of dependency records.

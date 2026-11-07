@@ -4,7 +4,9 @@ import { connectorInfo } from '../model/connectors';
 import type { Store } from '../state/store';
 import type { Snapshot } from '../types';
 import { button, el, icon } from '../ui/components';
+import type { DependencyState } from '../model/dependencies';
 import { connectorTile } from './connections';
+import { dependenciesBlock, readingLine } from './dependencies';
 import type { Handlers } from './main';
 
 /**
@@ -93,7 +95,42 @@ function fact(glyph: string, text: string, extra = ''): HTMLElement {
  * that lists every reference holding it (with the owner of the reference and their email) and the flows of this solution
  * that use each. The expander is a sibling of the radio, never inside it (a button cannot hold a button).
  */
-function connectionCard(store: Store, c: ConnectionChoice, selected: boolean, open: boolean): HTMLElement {
+interface DependencyContext {
+    readonly h: Handlers;
+    readonly deps: Readonly<Record<string, DependencyState>>;
+}
+
+/** The total over every reference that holds a connection: one line, once all of them have been read. */
+function connectionDependencies(c: ConnectionChoice, ctx: DependencyContext): HTMLElement {
+    const box = el('div', 'dep-connection');
+    const states = c.users.map(u => ctx.deps[u.id]);
+    const go = button('Check every dependency of this connection', 'secondary', () => void ctx.h.checkDependencies(c.users.map(u => u.id)), true);
+    go.prepend(icon('search', 'icon--sm'));
+    go.setAttribute('aria-label', `Check every dependency of connection ${c.id}`);
+    if (states.some(s => s?.status === 'loading')) {
+        box.append(readingLine(`Reading what depends on the ${c.users.length === 1 ? 'reference' : 'references'} that hold this connection...`));
+        return box;
+    }
+    if (states.every(s => s?.status === 'ready')) {
+        // distinct components over all the references (one may depend on two of them): 1 in the open solution, 0 outside
+        const all = new Map<string, number>();
+        for (const s of states) if (s?.status === 'ready') for (const d of s.report.items) all.set(d.id, d.inOpenSolution ? 1 : 0);
+        const total = all.size;
+        const outside = [...all.values()].filter(x => x === 0).length;
+        const line = el('p', 'dep-note');
+        line.append(icon(total === 0 ? 'check-circle' : outside > 0 ? 'alert-triangle' : 'info', `icon--sm ${total === 0 ? 'icon--success' : outside > 0 ? 'icon--warning' : 'icon--primary'}`), el('span', '', total === 0
+            ? 'Nothing depends on the references that hold this connection, anywhere in the environment.'
+            : `${total} ${total === 1 ? 'component depends' : 'components depend'} on the references that hold this connection: ${total - outside} in this solution, ${outside} outside.`));
+        box.append(line, go);
+        go.textContent = 'Check again';
+        go.prepend(icon('refresh', 'icon--sm'));
+        return box;
+    }
+    box.append(go);
+    return box;
+}
+
+function connectionCard(store: Store, c: ConnectionChoice, selected: boolean, open: boolean, ctx: DependencyContext): HTMLElement {
     const card = el('div', selected ? 'conn-item is-on' : 'conn-item');
     const facts = el('span', 'conn-facts');
     facts.append(fact('key', c.id, 'conn-fact--id'));
@@ -120,6 +157,9 @@ function connectionCard(store: Store, c: ConnectionChoice, selected: boolean, op
 
     if (open) {
         const list = el('ul', 'conn-users');
+        const total = el('li', 'conn-user conn-user--total');
+        total.append(connectionDependencies(c, ctx));
+        list.append(total);
         for (const u of c.users) {
             const li = el('li', 'conn-user');
             const name = el('div', 'conn-user-name');
@@ -136,6 +176,8 @@ function connectionCard(store: Store, c: ConnectionChoice, selected: boolean, op
                 }
                 li.append(flows);
             }
+            // everything that depends on this reference, in any solution (feature 023), on request
+            li.append(dependenciesBlock({ state: ctx.deps[u.id], subject: 'this reference', onCheck: () => void ctx.h.checkDependencies([u.id]), name: u.displayName }));
             list.append(li);
         }
         card.append(list);
@@ -185,7 +227,7 @@ function leave(layer: HTMLElement, then: () => void): void {
 }
 
 /** The layer to put over the studio dialog: a scrim and the panel. */
-export function newReferencePanel(snap: Snapshot, store: Store, h: Handlers, form: NewReferenceForm, environment: string): HTMLElement {
+export function newReferencePanel(snap: Snapshot, store: Store, h: Handlers, form: NewReferenceForm, environment: string, deps: Readonly<Record<string, DependencyState>> = {}): HTMLElement {
     const info = connectorInfo(form.connectorId);
     const prefix = prefixFor(snap);
     const check = checkForm(snap, form);
@@ -344,7 +386,7 @@ export function newReferencePanel(snap: Snapshot, store: Store, h: Handlers, for
         group.setAttribute('aria-label', 'Connection');
         group.append(option('No connection yet', form.connectionId === '', () => store.dispatch({ type: 'pickConnection', id: '' }), 'No connection yet', 'Created empty; connect it later in the Maker portal.'));
         if (form.live.status === 'loading') group.append(note('Reading your connections...'));
-        for (const c of cards) group.append(connectionCard(store, c, c.id.toLowerCase() === picked, form.openConnections.includes(c.id)));
+        for (const c of cards) group.append(connectionCard(store, c, c.id.toLowerCase() === picked, form.openConnections.includes(c.id), { h, deps }));
         section.append(group);
         if (form.live.status === 'ready' && cards.length === 0) section.append(note(`You have no ${info.name} connection yet. Create one in the Maker portal, then press Refresh.`));
         if (form.live.status === 'unavailable') section.append(note(`Your connections could not be read${form.live.error === '' ? '' : ` (${form.live.error})`}. Without them a connection cannot be verified, so only "No connection yet" can be used. Press Refresh to try again.`, 'warn'));

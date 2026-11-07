@@ -64,6 +64,35 @@ Each is its own plan/apply flow with its own preview. A single confirmation neve
   solution, any case); the display name should be unique and is only warned about. Suggestions offer the Maker style
   (connector, solution, random suffix), a readable one, and one by account; each is free in the environment.
 
+### T2d. Clean up (added 1.7.0, feature 022)
+- **Unused** is a member reference of the open unmanaged solution that no flow of that solution uses (flows whose
+  definition could not be read are reported). It may be used by what the solution does not show (other solutions,
+  agents): **Check dependencies** reads the whole environment (T2e) and shows which unused references nothing depends on
+  anywhere; Remove keeps the row, Delete asks the environment for dependencies (T2b).
+- **Duplicates** are member references with the same connector, the same custom connector and the same non-empty
+  connection id. Names are never compared. One of them is the keeper (most used, then by name, changeable).
+- Cleaning up is a view over the existing operations, never a new write: Remove and Delete go through T2b, a merge goes
+  through the re-point (T2.2). A merge is **two operations with two confirmations** (re-point the flows to the keeper,
+  then take the now unused duplicates away): a single confirmation never covers both (T2). One group is merged at a time
+  because a re-point holds one group per connector.
+- The confirmations of Remove and Delete open **over** the clean up dialog, which stays behind them; cancelling returns to
+  it as it was, and after the Result it opens again, read anew. A merge is the exception: it leaves the dialog to run the
+  re-point and offers the second step in the Result.
+- A reference that a flow which stays still uses is never offered for removal; the list is drawn from the solution as last
+  read, and choices that no longer hold are dropped when it is read again.
+
+### T2e. Dependencies are seen in the whole environment (added 1.8.0, feature 023)
+- "Used by" is never only the open solution. The dependencies of a reference are read from Dataverse dependency tracking
+  (`RetrieveDependentComponents`: everything that uses it; `RetrieveDependenciesForDelete`: what blocks its deletion), the
+  source of Show dependencies in the maker portal, in every solution of the environment. Read only, a GET, no header.
+- Each dependent is named, typed and located (state, managed, owner, the solutions that hold it); one that is not a member
+  of the open solution is marked "Outside this solution". The names of the component types are read from
+  `solutioncomponentdefinitions`, never guessed (T5); agents are added from their documented relationships to the
+  reference. A source that cannot be read is named in a note and never hides the others.
+- It is an explicit action with a visible wait (T8), a few references at a time, and its result is dropped when the
+  solution is read again (Principle VII). It informs; it never decides: Remove, Delete and merge keep their own rules
+  (T2b, T2d). The report says that it comes from dependency tracking and so cannot see what is not tracked.
+
 ### T3. Plan, preview, confirm, apply (Principle V)
 - Every write is first built as a plan (pure, testable): which rows, which field, old value, new value.
 - The preview lists every row that will change and the number of flows affected. Nothing is written before the user
@@ -136,6 +165,11 @@ Every flag states the data it is based on. No flag is a guess.
 - A selection of rows feeds the bulk plan. The count of selected rows and of affected flows is always visible before
   the user can open the preview.
 - Long operations show progress and can be left running; a result list stays available until dismissed.
+- While an action runs, every button is disabled (added 1.8.1, the author's global rule). One function decides "an action
+  is running" (`state/running.ts`) and one place applies it (`views/main.ts`, after each draw): a view never disables its
+  buttons for this by itself. The control that started the work keeps its normal look and shows its progress (a spinner,
+  `aria-busy`), so it reads as working and not as unavailable. Redraws must not move the focus to the top of a dialog or
+  the scroll of a list (the focus is given only when a dialog opens, and without scrolling).
 - Every wait is visible and honest (added 1.6.1): a control that starts work shows a spinner and says what is happening,
   never only a dimmed label; an operation with steps shows the steps with their real state (pending, active, done), driven
   by what the code reached and not by a timer; the end is shown (a done state) before the view moves on; with reduced
@@ -155,4 +189,4 @@ README, the specs, the research notes, the tests or the commit messages. A Credi
 or images are actually copied and a licence asks for it, and then only with the owner's written consent to be named.
 This tool copies nothing, so its README has no Credits section.
 
-**Version**: 1.6.1 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-07
+**Version**: 1.8.2 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-07
