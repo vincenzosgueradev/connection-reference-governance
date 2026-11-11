@@ -173,6 +173,13 @@ function referencesTable(s: State, store: Store, h: Handlers): { table: HTMLElem
     const snap = s.snapshot!;
     const shown = (snap.references as readonly ReferenceView[]).filter(r => matches(`${r.reference.displayName} ${r.reference.logicalName} ${connectorInfo(r.reference.connectorId).name} ${r.reference.ownerName}`, s.filter));
     const attention = shown.some(r => r.flags.length > 0);
+    // Opening a row reads what uses the reference in the whole environment by itself (once; a failed read is tried again).
+    const expand = (id: string): void => {
+        const opening = !s.expanded.includes(id);
+        store.dispatch({ type: 'toggleExpand', id });
+        const st = s.dependencies[id];
+        if (opening && (st === undefined || st.status === 'failed')) void h.checkDependencies([id]);
+    };
     const t = selectableTable({
         columns: attention ? ['Reference', 'Connector', 'Connection', 'Reference owner', 'Used by', 'Needs attention'] : ['Reference', 'Connector', 'Connection', 'Reference owner', 'Used by'],
         rows: shown,
@@ -180,8 +187,18 @@ function referencesTable(s: State, store: Store, h: Handlers): { table: HTMLElem
         label: r => r.reference.displayName || r.reference.logicalName,
         cells: r => {
             const ref = r.reference;
-            const used = el('span', r.flowIds.length === 0 ? 'muted' : '', r.flowIds.length === 0 ? 'No flow' : r.flowIds.length === 1 ? '1 flow' : `${r.flowIds.length} flows`);
-            used.title = r.flowIds.length === 0 ? 'No flow of this solution. Open the row and press Check dependencies to see everything that uses it in the environment.' : `Flows of this solution: ${r.flowIds.map(id => snap.flows.find(f => f.flow.id === id)?.flow.name ?? id).join(', ')}. Open the row to see what else uses it.`;
+            // Used by is a button: it opens the row and reads what uses the reference in the whole environment (not only this solution)
+            const name = ref.displayName || ref.logicalName;
+            const used = el('button', `used-link${r.flowIds.length === 0 ? ' muted' : ''}`, r.flowIds.length === 0 ? 'No flow' : r.flowIds.length === 1 ? '1 flow' : `${r.flowIds.length} flows`);
+            used.type = 'button';
+            used.setAttribute('aria-label', `What uses ${name}`);
+            used.title = r.flowIds.length === 0
+                ? 'No flow of this solution. Click to read everything that uses it in the whole environment.'
+                : `Flows of this solution: ${r.flowIds.map(id => snap.flows.find(f => f.flow.id === id)?.flow.name ?? id).join(', ')}. Click to read everything that uses it in the whole environment.`;
+            used.addEventListener('click', e => {
+                e.stopPropagation(); // the row must not toggle a second time
+                if (!s.expanded.includes(ref.id)) expand(ref.id); // an open row is left open
+            });
             const owner = el('span', 'cell-muted', ref.ownerName || 'Unknown');
             owner.title = 'The owner of the connection reference row, not of the connection behind it.';
             const cells = [referenceCell(ref, ref.logicalName), connectorName(ref.connectorId, ref.customConnectorId !== ''), connectionChip(ref.connectionId), owner, used];
@@ -189,6 +206,7 @@ function referencesTable(s: State, store: Store, h: Handlers): { table: HTMLElem
         },
         detail: r => referenceDetail(r, snap.flows, { state: s.dependencies[r.reference.id], onCheck: () => void h.checkDependencies([r.reference.id]) }),
         ...selectionHandlers(s, store),
+        onExpand: expand,
     });
     t.classList.add('refs-table');
     t.querySelectorAll('th').forEach(th => {

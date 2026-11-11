@@ -56,6 +56,27 @@ describe('the details of a reference', () => {
         expect(d.textContent).toContain('also outside this solution');
         expect(a.calls.dependentReads).toEqual([]);
     });
+    it('opening a row reads the whole environment by itself, without pressing anything, and closing then opening again does not read again', async () => {
+        const a = await inReferences();
+        byLabel(a.root, 'Show details of Ref 1').click();
+        await go(a);
+        expect(q(block(a.root), '.dep-summary-text')!.textContent).toContain('3 components depend on it');
+        byLabel(a.root, 'Hide details of Ref 1').click(); // closes
+        byLabel(a.root, 'Show details of Ref 1').click(); // opens again
+        await go(a);
+        expect(a.calls.dependentReads.length).toBe(1);
+    });
+    it('a click on Used by opens the row and reads the whole environment at once, once', async () => {
+        const a = await inReferences();
+        byLabel(a.root, 'What uses Ref 1').click();
+        await go(a);
+        expect(a.store.get().expanded).toContain(guid(1));
+        expect(q(block(a.root), '.dep-summary-text')!.textContent).toContain('3 components depend on it');
+        byLabel(a.root, 'What uses Ref 1').click(); // already open and read: nothing is read again, the row stays open
+        await go(a);
+        expect(a.store.get().expanded).toContain(guid(1));
+        expect(a.calls.dependentReads.length).toBe(1);
+    });
     it('shows a wait while it reads, then every dependent grouped by kind, with what is outside this solution marked', async () => {
         let release!: () => void;
         const gate = new Promise<void>(r => { release = r; });
@@ -114,7 +135,7 @@ describe('the details of a reference', () => {
     it('the Used by column says it is about this solution, and where to see the rest', async () => {
         const a = await inReferences();
         const cell = qa(a.root, 'tbody tr').find(r => r.textContent!.includes('Ref 3'))!.querySelector<HTMLElement>('td:last-child span, td:last-child')!;
-        expect(qa(a.root, 'tbody [title]').some(e => e.title.includes('Check dependencies'))).toBe(true);
+        expect(qa(a.root, 'tbody [title]').some(e => e.title.includes('whole environment'))).toBe(true);
         expect(cell).not.toBeNull();
     });
 });

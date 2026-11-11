@@ -560,3 +560,9 @@
 /* The global rule: while an action runs every button is disabled; the one that is working keeps its normal look (T8) */
 .is-running button:disabled { cursor: progress; }
 .is-running button[aria-busy="true"]:disabled { opacity: 1; }
+
+/* Used by: a button that opens the row and reads the dependencies of the whole environment. */
+.used-link { background: none; border: 0; padding: var(--sp-1) 0; font: inherit; color: var(--color-link, var(--color-primary)); cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.used-link:hover { text-decoration: underline; }
+.used-link.muted { color: var(--color-text-muted); }
+.used-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }

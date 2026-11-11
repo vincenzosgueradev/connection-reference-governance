@@ -69,3 +69,7 @@ When Delete is blocked because components outside the selection depend on a refe
 ## Amendment 2026-11-07 (check what is ticked)
 
 In Clean up the check works on the ticked references when there are any, else on all (see the amendment of feature 022). The block and the rest of the feature are unchanged.
+
+## Amendment 2026-11-11 (Used by reads the whole environment)
+
+**FR-2308**: Opening a row of the Connection references table (chevron, click on the row, or the Used by button) starts the check of the whole environment for that reference at once, with nothing to press, unless it was already read or is being read; a failed read is tried again; closing and opening again reads nothing. In the table the Used by cell is a button that does the same. The click does not toggle the row a second time. The button explains in its title that it reads the whole environment, not only this solution. Check dependencies in the details stays, for a retry (Check again). Requested by the author after the live test (2026-11-11).
