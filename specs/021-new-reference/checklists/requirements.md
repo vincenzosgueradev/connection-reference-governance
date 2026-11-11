@@ -14,7 +14,7 @@
 - [x] FR-2109/2110 connection cards and the Used by list are tested; no emoji; the email is not logged
 - [x] FR-2111/2112/2113 each have a test (found, missing, other connector, unreadable, checked again before the write, every suggestion valid)
 - [x] Only documented fields of the Connections API are read (name, id, properties.displayName, properties.createdTime)
-- [x] The tool still works without the Power Platform API (no connection chosen); the feature flag is declared
+- [x] A connection is required (FR-2125); without the Power Platform API nothing can be created; the feature flag is declared
 - [x] The slide is not restarted or cut by a redraw during it
 - [ ] Live check: the Connectivity call shape and the environment id in a real environment (quickstart 42)
 - [x] FR-2114 a created reference can be removed and deleted at once (test: create, then plan Remove and Delete without a refresh)

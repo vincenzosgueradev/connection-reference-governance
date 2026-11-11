@@ -36,6 +36,7 @@ async function open(a: App) {
 async function create(a: App, name = 'Brand New') {
     await open(a);
     type(a, 'Display name', name);
+    byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
     inPanel(a, 'Review')!.click();
     inPanel(a, 'Create in Sample')!.click();
     await a.controller.idle();
@@ -102,6 +103,9 @@ describe('the side panel', () => {
         type(a, 'Display name', 'Brand New');
         expect(byLabel(a.root, 'Name').value).toBe('BrandNew');
         expect(q(a.root, '.newref-prefix')!.textContent).toBe('sample_');
+        expect(inPanel(a, 'Review')!.disabled).toBe(true); // no connection chosen yet
+        expect(panel(a)!.textContent).toContain('Choose a connection');
+        byLabel(a.root, 'Use connection conn-free').click();
         inPanel(a, 'Review')!.click();
         expect(q(a.root, '.newref-step.is-current')!.textContent).toBe('Review');
         const text = q(a.root, '.newref-summary')!.textContent!;
@@ -147,11 +151,11 @@ describe('the header', () => {
 });
 
 describe('the connections come from the environment', () => {
-    it('reads them when the panel opens (environment id, then the list) and offers one card each, plus "No connection yet"', async () => {
+    it('reads them when the panel opens (environment id, then the list) and offers one card each, and nothing else', async () => {
         const a = await app();
         await open(a);
         expect(a.calls.connectionReads).toBe(1);
-        expect(qa(a.root, '.newref-connections .conn-item').map(c => c.querySelector('.conn-fact--id, .choice-name')!.textContent).sort()).toEqual(['No connection yet', 'conn-1', 'conn-2', 'conn-3', 'conn-free']);
+        expect(qa(a.root, '.newref-connections .conn-item').map(c => c.querySelector('.conn-fact--id, .choice-name')!.textContent).sort()).toEqual(['conn-1', 'conn-2', 'conn-3', 'conn-free']);
         expect(card(a, 'conn-4')).toBeUndefined(); // another connector's connection is never offered
     });
     it('each card has one fact per line with an icon (id, name, created, usage) and no emoji', async () => {
@@ -302,18 +306,16 @@ describe('pasting a connection id and checking it', () => {
         await a.controller.idle();
         expect(a.calls.connectionReads).toBe(2);
     });
-    it('when the connections cannot be read nothing can be verified: only "No connection yet" is left, and the panel says why', async () => {
+    it('when the connections cannot be read nothing can be verified, so nothing can be created, and the panel says why', async () => {
         const a = await app({ connections: 'unavailable' });
         await open(a);
         expect(panel(a)!.textContent).toContain('could not be read');
-        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(1);
+        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(0);
         type(a, 'Display name', 'Brand New');
         paste(a, 'conn-1');
         await checked(a);
         expect(inPanel(a, 'Review')!.disabled).toBe(true);
         expect(panel(a)!.textContent).toContain('cannot be verified');
-        byLabel(a.root, 'No connection yet').click();
-        expect(inPanel(a, 'Review')!.disabled).toBe(false);
     });
     it('the same when the environment id cannot be read', async () => {
         const a = await app({ noEnvironmentId: true });
@@ -325,12 +327,12 @@ describe('pasting a connection id and checking it', () => {
         const conns = [{ name: 'only', connector: 'shared_a', displayName: 'only@example.test' }];
         const a = await app({ connections: conns });
         await open(a);
-        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(2);
+        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(1);
         conns.push({ name: 'made-later', connector: 'shared_a', displayName: 'later@example.test' });
         byLabel(a.root, 'Refresh connections').click();
         await a.controller.idle();
         await settle();
-        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(3);
+        expect(qa(a.root, '.newref-connections .conn-item')).toHaveLength(2);
     });
     it('says so when the user has no connection for the connector', async () => {
         const a = await app({ connections: [{ name: 'b', connector: 'shared_b', displayName: 'x' }] });
@@ -356,6 +358,8 @@ describe('suggestions', () => {
         expect(byLabel(a.root, 'Display name').value).toContain(' - Sample');
         expect(byLabel(a.root, 'Name').value).toMatch(/Sample$/);
         expect(byLabel(a.root, 'Description').value).toContain('Sample');
+        expect(inPanel(a, 'Review')!.disabled).toBe(true); // still needs a connection
+        byLabel(a.root, 'Use connection conn-free').click();
         expect(inPanel(a, 'Review')!.disabled).toBe(false);
     });
     it('Auto-fill applies the first one', async () => {
@@ -376,6 +380,7 @@ describe('suggestions', () => {
         const a = await app();
         await open(a);
         type(a, 'Display name', 'x');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         inPanel(a, 'Review')!.click();
         expect(qa(a.root, '.sugg')).toHaveLength(0);
     });
@@ -412,6 +417,7 @@ describe('creating from the panel', () => {
         await open(a);
         byLabel(a.root, 'Use connection conn-free').click();
         type(a, 'Display name', 'Brand New');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         inPanel(a, 'Review')!.click();
         inPanel(a, 'Create in Sample')!.click();
         await a.controller.idle();
@@ -451,6 +457,7 @@ describe('creating from the panel', () => {
         const a = await app({ beforeCreate: () => gate });
         await open(a);
         type(a, 'Display name', 'Brand New');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         inPanel(a, 'Review')!.click();
         inPanel(a, 'Create in Sample')!.click();
         await settle();
@@ -465,6 +472,7 @@ describe('creating from the panel', () => {
         const a = await app();
         await open(a);
         type(a, 'Display name', 'Brand New');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         inPanel(a, 'Review')!.click();
         a.store.dispatch({ type: 'newReferenceSaving' });
         expect(byLabel(a.root, 'Close new reference').disabled).toBe(true);
@@ -511,6 +519,7 @@ describe('room, scroll and feedback (hand test 3)', () => {
         const a = await app();
         await open(a);
         type(a, 'Display name', 'Brand New');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         body(a).scrollTop = 300;
         inPanel(a, 'Review')!.click();
         expect(body(a).scrollTop).toBe(0);
@@ -571,6 +580,7 @@ describe('a visible wait (hand test 5)', () => {
     const toReview = async (a: App) => {
         await open(a);
         type(a, 'Display name', 'Brand New');
+        byLabel(a.root, 'Use connection conn-free').click(); // a connection is required
         inPanel(a, 'Review')!.click();
     };
     it('before Create the three lines are plain (idle), with no spinner and no bar', async () => {

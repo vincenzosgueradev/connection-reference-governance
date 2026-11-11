@@ -7,7 +7,7 @@ import { input, ref, solution } from './helpers/fixtures';
 const A = '/providers/Microsoft.PowerApps/apis/shared_a';
 const snap = (over = {}) => buildSnapshot(input(over));
 const ready = (...names: [string, string, string?][]): LiveState => ({ status: 'ready', error: '', items: names.map(([name, connectorKey, displayName]) => ({ name, connectorKey, displayName: displayName ?? '', createdTime: '2026-01-01T00:00:00Z' })) });
-const form = (over = {}) => ({ ...emptyForm(A), displayName: 'My Ref', name: 'MyRef', ...over });
+const form = (over = {}) => ({ ...emptyForm(A), displayName: 'My Ref', name: 'MyRef', connectionId: 'c1', connectionSource: 'card' as const, live: ready(['c1', 'a']), ...over });
 
 describe('suggestName', () => {
     it('keeps letters and digits, drops accents and spaces, never starts with a digit', () => {
@@ -28,10 +28,11 @@ describe('prefixFor', () => {
 });
 
 describe('checkForm', () => {
-    it('accepts a good form and warns that no connection is set', () => {
-        const c = checkForm(snap(), form());
-        expect(c.ok).toBe(true);
-        expect(c.warnings.join(' ')).toContain('No connection is set');
+    it('accepts a good form with a connection', () => expect(checkForm(snap(), form()).ok).toBe(true));
+    it('requires a connection: the Maker portal does not save a reference without one, and flows moved onto it fail with 0x80060467', () => {
+        const c = checkForm(snap(), form({ connectionId: '', connectionSource: 'none' }));
+        expect(c.ok).toBe(false);
+        expect(c.errors.connectionId).toContain('Choose a connection');
     });
     it('requires a display name and a name', () => {
         const c = checkForm(snap(), form({ displayName: ' ', name: '' }));
@@ -95,7 +96,6 @@ describe('checkForm', () => {
     it('blocks odd characters before looking anything up', () => {
         expect(checkForm(snap(), withPick(form({ live: ready(["x'; drop", 'a']) }), "x'; drop")).errors.connectionId).toContain('Letters');
     });
-    it('needs no verification when no connection is chosen', () => expect(checkForm(snap(), form({ connectionId: '' })).ok).toBe(true));
     it('only warns about a display name already used in this solution (Learn: it should be unique, it is not enforced)', () => {
         const c = checkForm(snap(), form({ displayName: 'ref 1' }));
         expect(c.ok).toBe(true);
@@ -117,7 +117,7 @@ describe('checkForm', () => {
 
 describe('newReferenceRecord', () => {
     it('carries the connector of the category and only what was filled in', () => {
-        expect(newReferenceRecord(snap(), form())).toEqual({ connectionreferencelogicalname: 'sample_MyRef', connectionreferencedisplayname: 'My Ref', connectorid: A });
+        expect(newReferenceRecord(snap(), form())).toEqual({ connectionreferencelogicalname: 'sample_MyRef', connectionreferencedisplayname: 'My Ref', connectorid: A, connectionid: 'c1' });
         expect(newReferenceRecord(snap(), form({ description: ' d ', connectionId: ' c1 ' }))).toMatchObject({ description: 'd', connectionid: 'c1' });
     });
     it('binds the custom connector when every reference of the connector shares one', () => {
@@ -132,7 +132,7 @@ describe('newReferenceRecord', () => {
 
 describe('connectionChoices', () => {
     const live = ready(['conn-1', 'a', 'one@example.test'], ['conn-2', 'a', 'two@example.test'], ['conn-free', 'a', 'free@example.test'], ['conn-b', 'b', 'b@example.test']);
-    it('is empty until the connections have been read', () => expect(connectionChoices(snap(), form())).toEqual([]));
+    it('is empty until the connections have been read', () => expect(connectionChoices(snap(), form({ live: emptyForm(A).live }))).toEqual([]));
     it('lists the connections of the connector as listed, never those of another connector', () => {
         expect(connectionChoices(snap(), form({ live })).map(c => c.id).sort()).toEqual(['conn-1', 'conn-2', 'conn-free']);
     });

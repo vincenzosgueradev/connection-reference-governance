@@ -62,20 +62,6 @@ function input(store: Store, field: Field, label: string, value: string, placeho
     return node;
 }
 
-function option(label: string, selected: boolean, onPick: () => void, title: string, detail: string): HTMLElement {
-    const node = el('button', selected ? 'choice choice--compact is-on' : 'choice choice--compact');
-    node.type = 'button';
-    node.setAttribute('role', 'radio');
-    node.setAttribute('aria-checked', String(selected));
-    node.setAttribute('aria-label', label);
-    const text = el('span', 'choice-text');
-    text.append(el('span', 'choice-name', title), el('span', 'choice-line', detail));
-    node.append(el('span', 'choice-mark'), text);
-    node.addEventListener('click', onPick);
-    const wrap = el('div', selected ? 'conn-item is-on' : 'conn-item');
-    wrap.append(node);
-    return wrap;
-}
 
 /** The kit's spinner; `onPrimary` makes it readable on a solid primary button. */
 function spinner(onPrimary = false): HTMLElement {
@@ -384,12 +370,11 @@ export function newReferencePanel(snap: Snapshot, store: Store, h: Handlers, for
         const group = el('div', 'newref-connections');
         group.setAttribute('role', 'radiogroup');
         group.setAttribute('aria-label', 'Connection');
-        group.append(option('No connection yet', form.connectionId === '', () => store.dispatch({ type: 'pickConnection', id: '' }), 'No connection yet', 'Created empty; connect it later in the Maker portal.'));
         if (form.live.status === 'loading') group.append(note('Reading your connections...'));
         for (const c of cards) group.append(connectionCard(store, c, c.id.toLowerCase() === picked, form.openConnections.includes(c.id), { h, deps }));
         section.append(group);
         if (form.live.status === 'ready' && cards.length === 0) section.append(note(`You have no ${info.name} connection yet. Create one in the Maker portal, then press Refresh.`));
-        if (form.live.status === 'unavailable') section.append(note(`Your connections could not be read${form.live.error === '' ? '' : ` (${form.live.error})`}. Without them a connection cannot be verified, so only "No connection yet" can be used. Press Refresh to try again.`, 'warn'));
+        if (form.live.status === 'unavailable') section.append(note(`Your connections could not be read${form.live.error === '' ? '' : ` (${form.live.error})`}. Without them a connection cannot be verified, so the reference cannot be created. Press Refresh to try again.`, 'warn'));
 
         // another connection of this connector: paste its name, then Enter or the search icon looks it up among the connections
         const paste = el('div', 'newref-paste');
@@ -412,6 +397,8 @@ export function newReferencePanel(snap: Snapshot, store: Store, h: Handlers, for
         if (form.connectionSource === 'typed' && normalizeConnectionName(form.connectionId) !== '') {
             if (form.live.status === 'loading') section.append(note('Checking...'));
             else if (check.errors.connectionId) section.append(note(check.errors.connectionId, form.checked === null || form.checked.id !== normalizeConnectionName(form.connectionId).toLowerCase() ? 'info' : 'error'));
+        } else if (form.connectionSource === 'none') {
+            section.append(note('Choose a connection. The Maker portal does not save a reference without one, and flows cannot be moved onto it.', 'info'));
         } else if (form.connectionSource === 'card') {
             const c = cards.find(x => x.id.toLowerCase() === picked);
             if (c) section.append(note(`Found: ${c.displayName === '' ? c.id : c.displayName}.`, 'ok'));

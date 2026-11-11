@@ -7,7 +7,8 @@ import { fakeHost, guid, input, ref, solution } from './helpers/fixtures';
 
 const A = '/providers/Microsoft.PowerApps/apis/shared_a';
 const NEW = guid(700);
-const form = (over = {}) => ({ ...emptyForm(A), displayName: 'My Ref', name: 'MyRef', reviewing: true, ...over });
+const seen = { status: 'ready' as const, error: '', items: [{ name: 'c1', connectorKey: 'a', displayName: '', createdTime: '' }] };
+const form = (over = {}) => ({ ...emptyForm(A), displayName: 'My Ref', name: 'MyRef', reviewing: true, connectionId: 'c1', connectionSource: 'card' as const, live: seen, ...over });
 const snap = (over = {}) => ({ ...buildSnapshot(input(over)), componentTypes: { [guid(1)]: 10001 } });
 
 interface Opts { taken?: boolean; failAdd?: boolean; member?: boolean; stored?: Partial<Record<string, string>>; failRemove?: boolean; createdId?: string; stillThere?: boolean }
@@ -19,12 +20,14 @@ function env(o: Opts = {}) {
     let removed = false;
     const h: Host = {
         ...fakeHost(() => []),
+        async environmentId() { return 'env-1'; },
+        async listConnections() { return { value: [{ id: '/providers/Microsoft.PowerApps/apis/shared_a/connections/c1', name: 'c1', properties: { displayName: 'c1@example.test' } }] } as Record_; },
         async query(q) {
             log.push(`query ${q}`);
             if (q.includes("connectionreferencelogicalname eq 'sample_MyRef'")) return created && !removed ? [{ connectionreferenceid: NEW }] : o.taken ? [{ connectionreferenceid: guid(1) }] : [];
             if (q.startsWith('solutioncomponents?$select=objectid')) return o.member === false ? [] : [{ objectid: NEW }];
             if (q.includes(`connectionreferenceid eq ${NEW}`) && q.includes('connectorid'))
-                return [{ connectionreferenceid: NEW, connectionreferencelogicalname: 'sample_MyRef', connectionreferencedisplayname: 'My Ref', connectorid: A, connectionid: '', ismanaged: false, _ownerid_value: '', _customconnectorid_value: '', ...o.stored } as Record_];
+                return [{ connectionreferenceid: NEW, connectionreferencelogicalname: 'sample_MyRef', connectionreferencedisplayname: 'My Ref', connectorid: A, connectionid: 'c1', ismanaged: false, _ownerid_value: '', _customconnectorid_value: '', ...o.stored } as Record_];
             if (q.includes(`connectionreferenceid eq ${NEW}`)) return created && !removed ? [{ connectionreferenceid: NEW }] : [];
             return [];
         },
@@ -154,7 +157,6 @@ describe('owner emails of the references', () => {
 
 describe('the connection is verified', () => {
     const conn = (name: string, key: string) => ({ id: `/providers/Microsoft.PowerApps/apis/shared_${key}/connections/${name}`, name, properties: { displayName: `${name}@example.test` } });
-    const seen = { status: 'ready' as const, error: '', items: [{ name: 'c1', connectorKey: 'a', displayName: '', createdTime: '' }] };
     const withList = (list: unknown[], over: Partial<Host> = {}, opts: Opts = {}) => {
         const { h, log } = env(opts);
         const host: Host = { ...h, async environmentId() { log.push('environment id'); return 'env-1'; }, async listConnections(id) { log.push(`list ${id}`); return { value: list } as Record_; }, ...over };
@@ -188,10 +190,11 @@ describe('the connection is verified', () => {
             expect(log.some(l => l.startsWith('create') || l.startsWith('add')), text).toBe(false);
         }
     });
-    it('does not ask for the list at all when there is no connection', async () => {
+    it('refuses a form without a connection and writes nothing', async () => {
         const { host, log } = withList([]);
-        await createReference(host, snap(), form());
-        expect(log).not.toContain('environment id');
+        const r = await createReference(host, snap(), form({ connectionId: '', connectionSource: 'none' }));
+        expect(r).toMatchObject({ ok: false, error: expect.stringContaining('Choose a connection') });
+        expect(log.some(l => l.startsWith('create') || l.startsWith('add'))).toBe(false);
     });
 });
 

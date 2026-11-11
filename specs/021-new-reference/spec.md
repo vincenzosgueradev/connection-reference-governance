@@ -25,9 +25,9 @@ In a category of the re-point dialog the user presses "New reference". The right
 
 A missing display name, a name that is not valid, a name that already exists in the environment (any solution, any case), a connection id with odd characters, or a publisher prefix that cannot be found: each is shown under its field and "Review" stays disabled. A display name used by another reference of the same connector in the solution is a warning, not a block.
 
-### User Story 3 - The connection is optional and chosen from facts (P2)
+### User Story 3 - The connection is required and chosen from facts (P2)
 
-The connection is one of: "No connection yet" (default: the reference is created empty and bound later in the Maker portal; a warning says flows will not run until then), a connection already used by a reference of this connector (named by the references that use it), or a pasted connection name. The tool does not list the user's connections: no verified source exists (see research of feature 000).
+The connection is required (changed after a live test, 2026-11-11: the Maker portal does not save a reference without one, and re-pointing flows onto a reference with no connection fails with Dataverse error 0x80060467). It is one of: a connection listed for the connector (a card), a connection already used by a reference of this connector (named by the references that use it), or a pasted connection name. The tool does not list the user's connections: no verified source exists (see research of feature 000).
 
 ### User Story 4 - A failure never leaves a half-made reference (P1)
 
@@ -103,8 +103,8 @@ Raised by the author: a pasted connection id that does not exist is a problem; t
 
 ### Behaviour
 
-1. **The connection must exist.** The panel reads the connections of the environment when it opens. The connection choices are those listed for this connector (one card each, with the references that use them). A pasted id has a **Check** button (also Enter) that reads the list again and looks the id up: found (the card is selected and "Found: <name>" is shown), not found, or of another connector. Only a found connection, or "No connection yet", lets Review open. A whole resource id (`.../connections/<name>`) is accepted and reduced to the name; names are not case sensitive.
-2. **When the connections cannot be read** (API not enabled, no permission, environment id unknown) nothing can be verified, so only "No connection yet" is available, and the panel says why and offers Refresh.
+1. **The connection must exist.** The panel reads the connections of the environment when it opens. The connection choices are those listed for this connector (one card each, with the references that use them). A pasted id has a **Check** button (also Enter) that reads the list again and looks the id up: found (the card is selected and "Found: <name>" is shown), not found, or of another connector. Only a found connection lets Review open (FR-2125: a connection is required). A whole resource id (`.../connections/<name>`) is accepted and reduced to the name; names are not case sensitive.
+2. **When the connections cannot be read** (API not enabled, no permission, environment id unknown) nothing can be verified, so no connection can be verified and the reference cannot be created; the panel says why and offers Refresh.
 3. **Checked again just before the write**: the list is read once more; a connection that has disappeared, or belongs to another connector, stops the write with nothing created.
 4. **Suggestions** (top of Details): up to three ready-made sets of display name, name and description, each one free in the environment: *Maker style* (`Connector Solution-suffix`, `prefix_sharedconnector_suffix`, as the Maker portal names them), *Readable* (`Connector - Solution`), and, when a connection is chosen, *By account* (`Connector (account)`). One click fills the three fields; Auto-fill applies the first. After a suggestion the name stays when the display name is edited.
 5. Limits are the Dataverse ones (display name 200, description 2000, connection 1000); our own cap of 50 for the part of the logical name after the prefix stays (conservative, the table allows 200).
@@ -112,7 +112,9 @@ Raised by the author: a pasted connection id that does not exist is a problem; t
 7. The panel opens with one draw (already "reading the connections") and a redraw during the slide continues the motion instead of restarting or snapping it.
 
 FR-2111: A connection MUST be found among the connections listed by the Power Platform API for this connector before Review opens, and again before the write.
-FR-2112: When the list cannot be read, no connection can be chosen except "No connection yet".
+FR-2112: When the list cannot be read, no connection can be chosen, so Review stays locked.
+
+FR-2125: A connection is REQUIRED. The form is invalid without one (message "Choose a connection"), the panel offers no "No connection yet" choice, and the creation refuses an empty connection before writing anything.
 FR-2113: Every suggestion MUST be free in the environment and MUST pass the form check.
 SC-2104: No reference is created with a connection that does not exist.
 

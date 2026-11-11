@@ -102,7 +102,7 @@ export function checkForm(snapshot: Snapshot, form: NewReferenceForm): FormCheck
     // a connection is only accepted when it was found among the connections of the environment: a card was listed; a typed
     // id has to be searched (Enter or the search icon) and found. Nothing is looked up while typing.
     const connection = normalizeConnectionName(form.connectionId);
-    if (connection === '') warnings.push('No connection is set: flows that use this reference will not run until it is connected in the Maker portal.');
+    if (connection === '') errors.connectionId = 'Choose a connection. A reference without one cannot be saved in the Maker portal, and flows moved onto it cannot be written (error 0x80060467).';
     else if (!CONNECTION_RULE.test(connection) || connection.length > CONNECTION_MAX) errors.connectionId = 'Letters, digits, "-", "_" and "." only.';
     else {
         const searched = form.connectionSource === 'typed' && form.checked !== null && form.checked.id === connection.toLowerCase();
@@ -112,7 +112,7 @@ export function checkForm(snapshot: Snapshot, form: NewReferenceForm): FormCheck
             if (verdict === 'missing') errors.connectionId = 'This connection was not found among your connections. Check the id, or press Refresh.';
             else if (verdict === 'other-connector') errors.connectionId = `This connection belongs to another connector, not ${connectorInfo(form.connectorId).name}.`;
             else if (verdict === 'unknown')
-                errors.connectionId = form.live.status === 'loading' ? 'Reading your connections...' : `Your connections could not be read${form.live.error === '' ? '' : ` (${form.live.error})`}, so this one cannot be verified. Choose "No connection yet", or press Refresh to try again.`;
+                errors.connectionId = form.live.status === 'loading' ? 'Reading your connections...' : `Your connections could not be read${form.live.error === '' ? '' : ` (${form.live.error})`}, so this one cannot be verified. Press Refresh to try again.`;
         }
     }
 

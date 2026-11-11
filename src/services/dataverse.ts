@@ -522,7 +522,8 @@ export async function createReference(host: Host, snapshot: Snapshot, form: NewR
         if (taken.length > 0) return { ok: false, error: `${logicalName} already exists in this environment; nothing was created.` };
         // a connection is asked about again now: it must still exist, for this connector, before anything is written
         const connection = normalizeConnectionName(form.connectionId);
-        if (connection !== '') {
+        if (connection === '') return { ok: false, error: 'A connection is required: a reference without one cannot be saved in the Maker portal and flows cannot be moved onto it. Nothing was created.' };
+        {
             const live = await loadLiveConnections(host);
             if (!live.ok) return { ok: false, error: `The connection could not be verified (${live.error}); nothing was created.` };
             const verdict = verifyConnection({ status: 'ready', items: live.value, error: '' }, form.connectorId, connection);
