@@ -80,8 +80,8 @@ export interface UnusedReference {
     readonly duplicateOf: string | undefined;
 }
 
-/** Member references that no flow of the solution uses, by name. Managed ones are listed but blocked. */
-export function unusedReferences(snapshot: Snapshot): UnusedReference[] {
+/** Member references that no flow of the solution uses, by name. Managed ones are listed but blocked. The duplicate tag follows the keeper the user chose (the suggested one when none). */
+export function unusedReferences(snapshot: Snapshot, cleanup: Cleanup | null = null): UnusedReference[] {
     const groups = duplicateGroups(snapshot);
     const nameOf = (id: string): string | undefined => {
         const r = snapshot.references.find(v => v.reference.id === id)?.reference;
@@ -96,7 +96,7 @@ export function unusedReferences(snapshot: Snapshot): UnusedReference[] {
                 reference: r,
                 blocked: snapshot.solution.managed || r.managed ? 'Managed: read-only.' : undefined,
                 neverConnected: r.connectionId.trim() === '',
-                duplicateOf: group && group.suggestedKeeper !== r.id ? nameOf(group.suggestedKeeper) : undefined,
+                duplicateOf: group && keeperOf(group, cleanup) !== r.id ? nameOf(keeperOf(group, cleanup)) : undefined,
             };
         })
         .sort((a, b) => byName(a.reference, b.reference));

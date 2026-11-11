@@ -23,6 +23,16 @@ describe('unusedReferences', () => {
         expect(by('sample_ref2')).toMatchObject({ neverConnected: false, duplicateOf: 'Ref 1' });
         expect(by('sample_ref3').duplicateOf).toBeUndefined();
     });
+    it('says a reference duplicates the one the user chose to keep, not only the suggested one', () => {
+        const refs = [ref(1, { connectionId: 'c' }), ref(2, { connectionId: 'c' }), ref(3, { connectionId: 'c' })];
+        const s = snap(refs, [flow(10, ['sample_other'])]);
+        const key = duplicateGroups(s)[0]!.key;
+        const u = unusedReferences(s, { ...emptyCleanup('unused'), keepers: { [key]: refs[2]!.id } });
+        const by = (n: string) => u.find(x => x.reference.logicalName === n)!;
+        expect(by('sample_ref1').duplicateOf).toBe('Ref 3');
+        expect(by('sample_ref2').duplicateOf).toBe('Ref 3');
+        expect(by('sample_ref3').duplicateOf).toBeUndefined(); // the one that is kept duplicates nobody
+    });
     it('lists a managed reference but never lets it be ticked', () => {
         const [m] = unusedReferences(snap([ref(1, { managed: true })]));
         expect(m!.blocked).toBe('Managed: read-only.');

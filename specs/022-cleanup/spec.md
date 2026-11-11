@@ -106,3 +106,11 @@ Found by hand: Remove from solution... and Delete... closed the clean up dialog 
 FR-2211: Remove and Delete started from Clean up MUST open over it, return to it when cancelled and open it again after their Result.
 
 Found by hand after the stacking: with a confirmation over the clean up dialog, every click made the confirmation flash (its opening animation played again). A redraw told only the first dialog to stay still. FR-2212: a redraw MUST NOT replay the opening of any dialog that was already open; only a dialog that has just opened animates.
+
+## Amendment 2026-11-11 (merge button in the fixed bar)
+
+When the Duplicates tab holds one group, its merge button (Merge into <keeper>... or Review as unused...) is in the fixed bar of the dialog next to Close, so it never scrolls out of sight; with several groups every card keeps its own button, since a bar button could not say which group it acts on. Requested by the author after the live test (2026-11-11).
+
+## Amendment 2026-11-11 (the duplicate tag follows the chosen keeper)
+
+In the Unused tab the tag "Duplicate of <name>" names the keeper the user chose in the Duplicates tab (the suggested one when none was chosen), and the chosen keeper itself carries no such tag. Seen in the live test: the tag kept naming the suggested reference after another had been chosen.

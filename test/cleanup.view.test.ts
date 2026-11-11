@@ -166,11 +166,19 @@ describe('the duplicates', () => {
         await open(a);
         tab(a, 'Duplicates').click();
         expect(q(dialog(a)!, '.dup-effect')!.textContent).toContain('1 flow will be re-pointed to Ref 1');
-        expect(q(dialog(a)!, '.dup-foot button')!.textContent).toBe('Merge into Ref 1...');
+        expect(q(dialog(a)!, '.modal-actions .btn--primary')!.textContent).toBe('Merge into Ref 1...');
         byLabel(dialog(a)!, 'Keep Ref 3').click();
         expect(q(dialog(a)!, '.dup-effect')!.textContent).toContain('3 flows will be re-pointed to Ref 3');
-        expect(q(dialog(a)!, '.dup-foot button')!.textContent).toBe('Merge into Ref 3...');
+        expect(q(dialog(a)!, '.modal-actions .btn--primary')!.textContent).toBe('Merge into Ref 3...');
         expect(a.calls.updates).toEqual([]); // choosing writes nothing
+    });
+    it('with one group the merge button is in the fixed bar of the dialog, not inside the scrolling list', async () => {
+        const a = await opened();
+        await open(a);
+        tab(a, 'Duplicates').click();
+        expect(q(dialog(a)!, '.modal-actions .btn--primary')).not.toBeNull();
+        expect(q(dialog(a)!, '.cleanup-content .dup-foot')).toBeNull();
+        expect(q(dialog(a)!, '.modal-actions')!.textContent).toContain('Close');
     });
     it('a merge starts the re-point with its Preview: the flows and the reference are chosen, nothing is written before it is confirmed', async () => {
         const a = await opened();
@@ -190,7 +198,7 @@ describe('the duplicates', () => {
         const a = await opened({ flows: [flowOf(10, ['sample_ref1'])] });
         await open(a);
         tab(a, 'Duplicates').click();
-        expect(q(dialog(a)!, '.dup-foot button')!.textContent).toBe('Review as unused...');
+        expect(q(dialog(a)!, '.modal-actions .btn--primary')!.textContent).toBe('Review as unused...');
         byLabel(dialog(a)!, 'Review the duplicates of dup-conn as unused').click();
         expect(a.store.get().wizard).toBeNull();
         expect(a.store.get().cleanup).toMatchObject({ tab: 'unused' });

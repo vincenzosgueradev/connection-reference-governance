@@ -70,7 +70,7 @@ function unusedRow(s: State, store: Store, h: Handlers, u: UnusedReference, on: 
 }
 
 function unusedTab(s: State, store: Store, h: Handlers, snap: Snapshot): HTMLElement[] {
-    const unused = unusedReferences(snap);
+    const unused = unusedReferences(snap, s.cleanup);
     const picked = s.cleanup!.picked;
     const out: HTMLElement[] = [];
     if (unused.length === 0) return [emptyState(`No unused connection reference in ${snap.solution.name}: every one is used by a flow.`, 'check-circle')];
@@ -134,8 +134,19 @@ function unusedTab(s: State, store: Store, h: Handlers, snap: Snapshot): HTMLEle
     return out;
 }
 
+/** The button that starts a merge of one group: a re-point of the flows of the others, or only their review as unused. */
+function mergeButton(s: State, h: Handlers, snap: Snapshot, g: DuplicateGroup): HTMLButtonElement {
+    const merge = mergeInput(snap, g, keeperOf(g, s.cleanup))!;
+    const flows = merge.flowIds.length;
+    const go = button(flows > 0 ? `Merge into ${nameOf(merge.keeper)}...` : 'Review as unused...', 'primary', () => h.startMerge(g.key));
+    go.prepend(icon(flows > 0 ? 'git-branch' : 'minus'));
+    go.setAttribute('aria-label', flows > 0 ? `Merge into ${nameOf(merge.keeper)}` : `Review the duplicates of ${g.connectionId} as unused`);
+    go.disabled = s.busy;
+    return go;
+}
+
 /** One group of duplicates: who holds the connection, a radio to keep one, and what a merge does. */
-function groupCard(s: State, store: Store, h: Handlers, snap: Snapshot, g: DuplicateGroup): HTMLElement {
+function groupCard(s: State, store: Store, h: Handlers, snap: Snapshot, g: DuplicateGroup, alone: boolean): HTMLElement {
     const keeperId = keeperOf(g, s.cleanup);
     const merge = mergeInput(snap, g, keeperId)!;
     const card = el('section', 'dup-card');
@@ -187,12 +198,12 @@ function groupCard(s: State, store: Store, h: Handlers, snap: Snapshot, g: Dupli
         : `No flow uses the other ${plural(merge.duplicates.length, 'reference', 'references')}: ${merge.duplicates.length === 1 ? 'it is' : 'they are'} already unused and can be removed or deleted.`));
     card.append(effect);
     if (managed > 0) card.append(note(`${plural(managed, 'managed reference', 'managed references')} cannot be removed; the flows are re-pointed away from ${managed === 1 ? 'it' : 'them'} all the same.`));
-    const foot = el('footer', 'dup-foot');
-    const go = button(flows > 0 ? `Merge into ${nameOf(merge.keeper)}...` : 'Review as unused...', 'primary', () => h.startMerge(g.key));
-    go.prepend(icon(flows > 0 ? 'git-branch' : 'minus'));
-    go.setAttribute('aria-label', flows > 0 ? `Merge into ${nameOf(merge.keeper)}` : `Review the duplicates of ${g.connectionId} as unused`);
-    foot.append(go);
-    card.append(foot);
+    // with one group the button is in the fixed bar of the dialog; with several, each card keeps its own (a bar button could not say which)
+    if (!alone) {
+        const foot = el('footer', 'dup-foot');
+        foot.append(mergeButton(s, h, snap, g));
+        card.append(foot);
+    }
     return card;
 }
 
@@ -200,7 +211,7 @@ function duplicatesTab(s: State, store: Store, h: Handlers, snap: Snapshot): HTM
     const groups = duplicateGroups(snap);
     if (groups.length === 0) return [emptyState('No duplicates: no two references of this solution hold the same connection of the same connector.', 'check-circle')];
     const out: HTMLElement[] = [note('Duplicates hold the same connection of the same connector, so one of them is enough. Choose the one to keep: the flows of the others are re-pointed to it (a Preview first), and then the others can be taken away.')];
-    for (const g of groups) out.push(groupCard(s, store, h, snap, g));
+    for (const g of groups) out.push(groupCard(s, store, h, snap, g, groups.length === 1));
     return out;
 }
 
@@ -240,7 +251,7 @@ export function cleanupDialog(s: State, store: Store, h: Handlers, environment: 
     overlay.classList.add('studio-overlay');
     makeExpandable(overlay, s.dialogExpanded, on => store.dispatch({ type: 'setDialogExpanded', on }));
 
-    // the footer: Remove and Delete for the ticked unused references; a merge has its own button on every card
+    // the footer: Remove and Delete for the ticked unused references; one group: its merge button is here; several: every card has its own
     const actions = box.querySelector<HTMLElement>('.modal-actions')!;
     const closeBtn = button('Close', 'secondary', close);
     actions.replaceChildren(closeBtn);
@@ -255,6 +266,9 @@ export function cleanupDialog(s: State, store: Store, h: Handlers, environment: 
         del.disabled = none;
         del.title = 'Deletes the ticked rows from the environment, after checking what depends on them';
         actions.append(remove, del);
+    } else {
+        const groups = duplicateGroups(snap);
+        if (groups.length === 1) actions.append(mergeButton(s, h, snap, groups[0]!));
     }
     const first = box.querySelector<HTMLElement>('.cleanup-row .check:not(:disabled), .dup-card .choice, .segment');
     (first ?? closeBtn).dataset['autofocus'] = 'true';
