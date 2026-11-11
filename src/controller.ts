@@ -84,8 +84,14 @@ export function createController(
             results = [{ id: '', label: 'The run', status: 'failed', message: `The run stopped unexpectedly: ${e instanceof Error ? e.message : String(e)}` }];
         }
         store.dispatch({ type: 'rowsDone', now: clock() });
-        const refreshed = await readSolution(); // so that the screen shows what is really stored
-        clearInterval(timer);
+        let refreshed = false;
+        try {
+            refreshed = await readSolution(); // so that the screen shows what is really stored
+        } catch {
+            refreshed = false; // whatever happens while reading, the run still ends in the Result
+        } finally {
+            clearInterval(timer);
+        }
         store.dispatch({ type: 'applied', results, now: clock(), refreshFailed: !refreshed });
         const failed = results.filter(r => r.status === 'failed').length;
         log(`Applied: ${results.filter(r => r.status === 'done').length} done, ${failed} failed.`, failed ? 'warning' : 'success');
