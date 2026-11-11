@@ -6,6 +6,10 @@ All notable changes are listed here, newest first. Format: Keep a Changelog; ver
 
 ### Added
 
+- Clean up: the tag "Duplicate of ..." in the Unused tab names the reference you chose to keep, not only the suggested one.
+- Clean up: with one group of duplicates its merge button (Merge into... or Review as unused...) sits in the fixed bar of the dialog, next to Close, instead of at the end of the scrolling list.
+- Opening a reference row (or clicking Used by) reads what uses the reference in the whole environment by itself, with nothing to press; Check again stays for a retry.
+- New reference: a connection is now required, as in the Maker portal. Before, a reference could be created with no connection, and re-pointing flows onto it failed with Dataverse error 0x80060467 ("connection references need connections"). The "No connection yet" choice is gone.
 - Dependencies in the whole environment: the details of a reference have Check dependencies, which lists everything that uses it in any solution (flows, agents, apps, other components) with state, owner and the solutions that hold them, marking what is outside the open solution. The same in the new-reference panel (every reference that holds a connection and the total for the connection) and in Clean up (a verdict per unused reference, Select the ones nobody uses, and the duplicates). A blocked Delete now names the components that block it. Read only, on request, from Dataverse dependency tracking.
 - A confirmation over the clean up dialog no longer flashes on every click.
 - Clean up: Remove and Delete now open their confirmation over the clean up dialog instead of taking you to the list; Cancel returns to it with your ticks, and after the Result it opens again with the list read anew.
