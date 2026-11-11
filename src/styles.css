@@ -283,11 +283,14 @@
 .confirm-dialog .modal-body { flex: 1 1 auto; }
 
 /* Switches say ON or OFF (the kit's bare knob is hard to read) */
-.toggle { width: 56px; height: 24px; }
-.toggle::before { content: 'OFF'; position: absolute; inset: 0 9px 0 auto; display: flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-muted); }
-.toggle::after { top: 2px; left: 2px; width: 18px; height: 18px; }
-.toggle.is-on::before { content: 'ON'; inset: 0 auto 0 9px; color: var(--color-on-primary); }
-.toggle.is-on::after { transform: translateX(32px); }
+.toggle { width: 66px; height: 26px; }
+.toggle::before { content: 'OFF'; position: absolute; inset: 0 11px 0 auto; display: flex; align-items: center; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.toggle::after { top: 3px; left: 3px; width: 18px; height: 18px; }
+.toggle.is-on::before { content: 'ON'; inset: 0 auto 0 12px; color: var(--color-on-primary); }
+.toggle.is-on::after { transform: translateX(40px); }
+/* Off: a visible edge, so the switch reads as a control and not as part of the sentence; the row keeps a wider gap. */
+.toggle:not(.is-on) { border-color: var(--color-text-muted); }
+.ack { gap: var(--sp-4); }
 
 /* The dialog of Remove from solution and Delete (feature 019) */
 .removal-dialog { width: min(920px, 100%); }
