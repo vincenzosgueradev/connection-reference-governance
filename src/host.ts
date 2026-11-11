@@ -119,7 +119,7 @@ export function createHost(): Host {
             return c ? `${c.name} (${c.environment})` : '';
         },
         async notify(message, kind) {
-            await window.toolboxAPI.utils.showNotification({ title: 'Connection Reference Governance', body: message, type: kind });
+            await window.toolboxAPI.utils.showNotification({ title: 'Connection Reference Governance', body: message, type: kind, duration: 6000 }); // closes by itself: the host's close button was seen not to respond
         },
     };
 }
