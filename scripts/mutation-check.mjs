@@ -74,20 +74,53 @@ const mutants = [
     ['src/model/removal.ts', "if (outside.length === 0) return undefined;", "return undefined;", 'dependencies ignored when planning a delete'],
     ['src/model/removal.ts', "if (found === undefined) return", "if (false) return", 'unreadable dependencies allowed'],
     ['src/services/dataverse.ts', "if (outside.length > 0) return { status: 'skipped'", "if (false) return { status: 'skipped'", 'dependencies not checked again at the delete'],
-    ['src/controller.ts', "const deps = await readDependencies(host, snapshot, chosen);", "const deps = undefined;", 'dependencies not read before a delete'],
+    ['src/controller.ts', "const deps = await readDependencies(host, snapshot, ids);", "const deps = {};", 'dependencies not read before a delete'],
     ['src/views/main.ts', "remove.disabled = off || allInUse;", "remove.disabled = allInUse;", 'Remove enabled without selection'],
     ['src/views/main.ts', "del.disabled = off || allInUse;", "del.disabled = allInUse;", 'Delete enabled without selection'],
+    // feature 024: the Connections area (the plan of a deletion, who can be selected, the verdict, the flag and the checks of the run)
+    ['src/model/connectionPlan.ts', "if (canSelect(row, deps)) return undefined;", "if (true) return undefined;", 'connection with a dependency is writable'],
+    ['src/model/connections.ts', "verdictFor(deps, row.name) === 'none-found'", "verdictFor(deps, row.name) !== undefined", 'connection with a dependency can be selected'],
+    ['src/model/connectionDeps.ts', "? 'unchecked-source' : 'none-found'", "? 'none-found' : 'none-found'", 'failed source read as no dependency found'],
+    ['src/services/connections.ts', "if (!features.connectionDelete) {", "if (false) {", 'connections deleted while the flag is off'],
+    ['src/services/connections.ts', "else if (after.value.rows.some(x => x.name === row.name)) out('failed'", "else if (false) out('failed'", 'connection done without the read-back'],
+    ['src/services/connections.ts', "const reason = blockReason(row, deps);", "const reason: string | undefined = undefined;", 'dependencies not checked again before a delete'],
+    ['src/host.ts', "if (!features.connectionDelete) throw new Error('Deleting connections is switched off.');", "", 'host deletes while the flag is off'],
+    ['src/state/connectionsState.ts', "if (!features.connectionDelete || c.deletion !== null", "if (c.deletion !== null", 'dialog opens while the flag is off'],
+    ['src/state/connectionsState.ts', "d.typedCode.trim() !== d.code || !d.ack", "false", 'delete run without the code and the acknowledgement'],
+    ["src/state/connectionsState.ts", "if (!writableRows(d.plan).every(r => d.portalChecked.includes(r.name))) return c;", "", "apply without every connection confirmed in the portal"],
+    ["src/state/connectionsState.ts", "!writableRows(d.plan).some(r => r.name === a.name)", "false", "a name outside the run can be confirmed in the portal"],
+    ["src/model/connections.ts", "!isFlowOwned(row) && verdictFor(deps, row.name) === 'none-found'", "verdictFor(deps, row.name) === 'none-found'", "a flow-owned connection can be selected"],
+    ["src/services/connections.ts", "if (unclear.length > 0) sources.flows = failedState(", "if (false) sources.flows = failedState(", "a flow that cannot be tied to a connection does not block"],
+    ["src/services/connections.ts", "uses.every(r => r !== undefined && r.connectionId !== '' && r.connectionId !== key)", "true", "a flow with an unknown reference counted as on another connection"],
+    ["src/model/connectionPlan.ts", "return Math.min(95,", "return Math.min(999,", "the percentage passes 95 before the end"],
+    ["src/state/connectionsState.ts", "search: '', shown: CONN_PAGE", "search: c.search, shown: CONN_PAGE", "the search stays after a deletion"],
+    ["src/views/connectionDeletion.ts", "overlay.querySelector('.modal-close')?.remove();", "", "the cross stays while the deletion runs"],
+    ["src/services/connections.ts", "say(r.name, r.label, 'delete');", "", "the delete step is not announced"],
+    ["src/state/connectionsState.ts", "a.keepDeps ? Object.fromEntries", "false ? Object.fromEntries", "a reload after a deletion drops what was read"],
+    ["src/host.ts", "if (!features.connectionDelete) throw new Error('Deleting connections is switched off.');", "", "the flag does not guard the delete request"],
 ];
 
 // `node scripts/mutation-check.mjs <text>` runs only the mutants whose file or name contains the text.
 const only = process.argv[2];
 const survivors = [];
-for (const [file, from, to, name] of mutants) {
-    if (only && !`${file} ${name}`.includes(only)) continue;
+const todo = mutants.filter(([file, , , name]) => !only || `${file} ${name}`.includes(only));
+const started = Date.now();
+let doneCount = 0;
+const progressFile = process.env.MUTATION_PROGRESS;
+const progress = () => {
+    const secs = Math.round((Date.now() - started) / 1000);
+    const left = doneCount === 0 ? '?' : Math.round(((secs / doneCount) * (todo.length - doneCount)) / 60);
+    const line = `PROGRESS ${doneCount}/${todo.length} done, ${survivors.length} survived, ${Math.round(secs / 60)} min elapsed, about ${left} min left`;
+    console.log(line);
+    if (progressFile) writeFileSync(progressFile, `${line}\n`);
+};
+for (const [file, from, to, name] of todo) {
     const original = readFileSync(file, 'utf8');
     if (!original.includes(from)) {
         console.log(`SKIPPED (pattern not found): ${name}`);
         survivors.push(`${name} (pattern not found)`);
+        doneCount++;
+        progress();
         continue;
     }
     try {
@@ -103,6 +136,8 @@ for (const [file, from, to, name] of mutants) {
     } finally {
         writeFileSync(file, original);
     }
+    doneCount++;
+    progress();
 }
 console.log(survivors.length === 0 ? `\nAll ${mutants.length} mutants killed.` : `\n${survivors.length} survivors:\n- ${survivors.join('\n- ')}`);
 process.exit(survivors.length === 0 ? 0 : 1);

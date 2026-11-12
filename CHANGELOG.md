@@ -2,6 +2,25 @@
 
 All notable changes are listed here, newest first. Format: Keep a Changelog; versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+
+- Connections: deleting connections is on. It was checked live on 28 connections of a test environment (each checked again, deleted and read back); the dialog is wider and cannot be closed while it runs.
+- Connections: the connector filter shows the drawing of every connector next to its name and its count, instead of a plain list.
+- Connections: the Power Platform inventory names the flows that use a connector; each is read in Dataverse and told apart (uses this connection, uses another, or cannot be tied to one). A flow that cannot be tied to a connection is listed by name and the connection is then Could not be checked instead of No dependency found. When the inventory is refused nothing changes.
+- Connections: before a deletion each connection is confirmed in the Maker portal, one by one (the tool cannot see flows that live only in the flow service); Delete unlocks only when all are confirmed. Connections that belong to a flow are no longer listed.
+- Connections: with connections ticked, the check button becomes Check selected and reads only those; the figure on the right counts the ticks. Check all and the deletion run now show a ring, phases, counters, the connector in hand and, for the deletion, a log with the time of each line.
+- Connections: a second area, outside any solution, that lists the connections of the environment that you can see with their connector, status, times, creator and id; the counts (total, broken, no dependency found, in use) sit on the filters (All, Broken, No dependency found, In use, by connector), with no header or row of figures, so the list gets the room; search and sorting; 100 rows at a time.
+- Opening a connection reads what depends on it by itself: apps (Power Platform API), connection references, flows and agents (Dataverse), and flows that hold the connection by name when the environment allows it. A source that cannot be read is named and never hides the others. A connection nothing was found for is shown as No dependency found, never as unused, with a note of what was and was not looked at.
+- Flows that dependency tracking leaves out are found by searching their definitions for the name of each reference that holds the connection (compared with the portal on an Office 365 connection: 14 flows in common, each side with some the other lacks).
+- The coverage note says how much each source read ("11 apps, 57 connection references (0 hold it)"), each problem is said once, a permission refusal is said in words, and the detail of a connection with No dependency found says next to it that the portal can show flows this tool cannot see. The Power Automate API was tried and the toolbox is not allowed to call it.
+- Check all reads every connection four at a time with a progress bar and a Cancel (what was read is kept), and Select the ones with no dependency found ticks the connections that can be deleted.
+- Deleting connections: Preview, a backup with no email and no secret, a one-time code and an acknowledgement, each connection checked again just before and read back after. It is switched off (the declared flag `connectionDelete`) until the route is verified on a test connection; while it is off each connection offers Copy portal address.
+- Connections: simpler layout. The two areas are tabs; one toolbar row and one row of actions; short rows with a short code of the id and the whole id in the tooltip and the details (nothing is truncated); the sort is the header of the column; the list is the only region that scrolls.
+- A connection held only by connection references (no flow, app or agent found using them) says Held by N reference(s) instead of In use; it is still a dependency and cannot be selected for deletion.
+- The connection chip of a reference in the solution views opens that connection in the Connections area.
+
 ## [0.1.0] - 2026-11-04
 
 ### Added
