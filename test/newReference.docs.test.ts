@@ -35,11 +35,18 @@ describe('the Power Platform API is declared and kept read only (feature 021, co
         expect(read('src/host.ts')).toMatch(/powerplatformAPI/);
         expect(pkg.features.enabledForPowerPlatformAPI).toBe(true);
     });
-    it('the only call to the Power Platform API is a GET of the connections list with the documented api-version', () => {
+    it('the calls to the Power Platform API are two GETs (the connections, the apps), one read only inventory query (POST) and one guarded delete (the connections, Connectivity), with the documented api-version', () => {
+        // feature 024 added the apps list (read only) and the deletion of a connection, which cannot run while the flag is off
         const host = read('src/host.ts');
         const calls = [...host.matchAll(/powerplatformAPI\.(\w+)\.(\w+)\(/g)].map(m => `${m[1]}.${m[2]}`);
-        expect(calls).toEqual(['Connectivity.Get']);
-        expect(host).toMatch(/environments\/\$\{environmentId\}\/connections\?api-version=2024-10-01/);
+        expect(calls).toEqual(['Connectivity.Get', 'PowerApps.Get', 'ResourceQuery.Post', 'Connectivity.Delete']);
+        // the one POST is the inventory query: a fixed body that reads, with no write clause
+        expect(host).toMatch(/resources\/query\?api-version=\$\{API_VERSION\}/);
+        // the delete is one call, on the route that the live check found, after the guard of the flag
+        expect(host.match(/\.Delete\(/g)).toHaveLength(1);
+        expect(host).toMatch(/const API_VERSION = '2024-10-01'/);
+        expect(host).toMatch(/environments\/\$\{environmentId\}\/connections\?api-version=\$\{API_VERSION\}/);
+        expect(host).toMatch(/if \(!features\.connectionDelete\) throw new Error\('Deleting connections is switched off\.'\);\s+await window\.powerplatformAPI\.Connectivity\.Delete\(/);
     });
     it('the constitution and the README say the tool reads the connections', () => {
         expect(read('.specify/memory/constitution.md')).toMatch(/powerplatformAPI\.Connectivity/);

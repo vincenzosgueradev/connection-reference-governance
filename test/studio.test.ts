@@ -450,8 +450,14 @@ describe('the confirmation dialog (retyle)', () => {
         const { readFileSync } = await import('node:fs');
         const { resolve } = await import('node:path');
         const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
-        expect(css).toMatch(/\.modal-actions \.btn--danger:not\(:disabled\) \{[^}]*linear-gradient/);
-        expect(css).toMatch(/\.modal-actions \.btn--danger:disabled \{[^}]*opacity: 1/);
+        // a dangerous button is never filled with a light colour or a gradient, anywhere (author rule 2026-11-11)
+        const ui = readFileSync(resolve(process.cwd(), 'src/ui/ui.css'), 'utf8');
+        for (const sheet of [css, ui]) {
+            for (const m of sheet.matchAll(/[^{}]*\.btn--danger[^{}]*\{([^}]*)\}/g)) {
+                expect(m[1]).not.toMatch(/linear-gradient|background:\s*(#fff|white|var\(--color-error\))/i);
+            }
+        }
+        expect(ui).toMatch(/\.btn--danger:disabled \{[^}]*background: var\(--color-surface-2\)/);
     });
 });
 

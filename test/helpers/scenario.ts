@@ -25,6 +25,28 @@ export interface ScenarioOptions {
     beforeDependents?: () => Promise<void>;
     /** Answers a query first (the names of components outside the solution); undefined falls through to the scenario. */
     answer?: (q: string) => Record<string, unknown>[] | undefined;
+    /**
+     * Feature 024: the connections of the Connections area, with what the list says about each (status, times, creator).
+     * Read live at every call, so a test may change the array between two reads. `pageSize` splits the list in pages.
+     */
+    connectionRows?: ConnectionSeed[];
+    pageSize?: number;
+    /** The apps the Power Apps API lists, with the connections each uses; `appsFail` makes the call fail (an administrator call). */
+    apps?: { name: string; displayName: string; owner?: string; connections: string[] }[];
+    appsFail?: string;
+    /** The rows the inventory (Resource Query) returns; `usageFail` makes the call fail. */
+    usage?: Record<string, unknown>[];
+    usageFail?: string;
+    beforeApps?: () => Promise<void>;
+    /** The cloud flows that hold a connection by name (the answer of the search on `clientdata`); 'refused' makes the search fail. */
+    flowsByConnection?: Record<string, { id: string; name: string; state?: number }[]>;
+    flowSearch?: 'ok' | 'refused';
+    /** Makes deleting a connection fail with this message (by name); a deleted connection leaves the list. */
+    deleteConnectionError?: (name: string) => string | undefined;
+    /** Waits before a connection is deleted. */
+    beforeDeleteConnection?: (name: string) => Promise<void>;
+    /** Makes a page of the list fail (1 is the second page). */
+    failPage?: number;
     /** The connections the Power Platform API lists; 'unavailable' makes the list fail; a function gives them per call. */
     connections?: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] | 'unavailable';
     /** Waits before the row is created / before it is added to the solution, so a test can look at the screen in the middle. */
@@ -54,6 +76,33 @@ export interface ScenarioOptions {
     ignoreState?: boolean;
 }
 
+/** One connection of the Connections area as a test writes it; the scenario turns it into the answer of the API. */
+export interface ConnectionSeed {
+    name: string;
+    connector?: string;
+    displayName?: string;
+    /** `none` leaves `statuses` out of the answer. */
+    status?: 'connected' | 'error' | 'reconnect' | 'none';
+    createdTime?: string;
+    modifiedTime?: string;
+    creator?: string;
+    creatorEmail?: string;
+}
+
+const seedToApi = (c: ConnectionSeed) => ({
+    id: `/providers/Microsoft.PowerApps/apis/${c.connector ?? 'shared_a'}/connections/${c.name}`,
+    name: c.name,
+    properties: {
+        displayName: c.displayName ?? `${c.name}@example.test`,
+        createdTime: c.createdTime ?? '2026-01-01T00:00:00Z',
+        lastModifiedTime: c.modifiedTime ?? '2026-01-02T00:00:00Z',
+        createdBy: { displayName: c.creator ?? 'Ann', email: c.creatorEmail ?? 'ann@example.test' },
+        ...(c.status === 'none'
+            ? {}
+            : { statuses: [c.status === 'error' ? { status: 'Error', error: { code: 'Forbidden', message: 'Access denied' } } : c.status === 'reconnect' ? { status: 'Error', error: { code: 'Unauthenticated', message: 'Token expired' } } : { status: 'Connected' }] }),
+    },
+});
+
 const B = '/providers/Microsoft.PowerApps/apis/shared_b';
 export const defaultReferences = (): ConnectionReferenceRow[] => [ref(1), ref(2), ref(3), ref(4, { connectorId: B })];
 /** The connections the default scenario lists: the ones the default references hold, plus one nobody uses yet. */
@@ -78,7 +127,8 @@ export function scenario(opts: ScenarioOptions = {}) {
     let wrote = false;
     const notMember = new Set<string>(); // created references until they are added to the solution
     let nextId = 500;
-    const calls = { dependentReads: [] as string[], connectionReads: 0, created: [] as Record<string, unknown>[], added: [] as { solution: string; id: string; type: number }[], queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
+    const deletedConnections = new Set<string>();
+    const calls = { appReads: 0, connectionPages: [] as string[], searches: [] as string[], deletedConnections: [] as { environmentId: string; connector: string; name: string }[], copied: [] as string[], dependentReads: [] as string[], connectionReads: 0, created: [] as Record<string, unknown>[], added: [] as { solution: string; id: string; type: number }[], queries: [] as string[], updates: [] as { entity: string; id: string; record: Record<string, unknown> }[], saved: [] as { name: string; content: string }[] };
 
     const host: Host = {
         async query(q) {
@@ -136,13 +186,47 @@ export function scenario(opts: ScenarioOptions = {}) {
         async environmentId() {
             return opts.noEnvironmentId ? '' : 'env-1';
         },
-        async listConnections(environmentId) {
+        async listConnections(environmentId, next = '') {
             calls.connectionReads++;
+            calls.connectionPages.push(next);
             await opts.beforeConnections?.();
             if (opts.connections === 'unavailable') throw new Error('The Power Platform API is not enabled for this connection.');
             expect(environmentId).toBe('env-1');
+            if (opts.connectionRows !== undefined) {
+                const all = opts.connectionRows.filter(c => !deletedConnections.has(c.name));
+                const size = opts.pageSize ?? all.length + 1;
+                const page = next === '' ? 0 : Number(next.replace(/^page-/, ''));
+                if (opts.failPage !== undefined && page === opts.failPage) throw new Error('The page could not be read.');
+                const slice = all.slice(page * size, page * size + size);
+                return { value: slice.map(seedToApi), ...((page + 1) * size < all.length ? { nextLink: `page-${page + 1}` } : {}) };
+            }
             const list: readonly { name: string; connector: string; displayName: string; createdTime?: string }[] = opts.connections ?? defaultConnections();
             return { value: list.map(c => ({ id: `/providers/Microsoft.PowerApps/apis/${c.connector}/connections/${c.name}`, name: c.name, properties: { displayName: c.displayName, createdTime: c.createdTime ?? '2026-01-01T00:00:00Z' } })) };
+        },
+        async queryConnectorUsage() {
+            if (opts.usageFail) throw new Error(opts.usageFail);
+            return { data: opts.usage ?? [] };
+        },
+        async listApps() {
+            calls.appReads++;
+            await opts.beforeApps?.();
+            if (opts.appsFail) throw new Error(opts.appsFail);
+            return { value: (opts.apps ?? []).map(a => ({ name: a.name, properties: { displayName: a.displayName, owner: { displayName: a.owner ?? '' }, connectionReferences: a.connections.map(c => ({ id: '/providers/Microsoft.PowerApps/apis/shared_a', sharedConnectionId: c })) } })) };
+        },
+        async searchFlowsByConnection(name) {
+            calls.searches.push(name);
+            if (opts.flowSearch === 'refused') throw new Error('The filter is not supported on this column.');
+            return (opts.flowsByConnection?.[name] ?? []).map(f => ({ workflowid: f.id, name: f.name, statecode: f.state ?? 1, _ownerid_value: '' }));
+        },
+        async deleteConnection(environmentId, connector, name) {
+            await opts.beforeDeleteConnection?.(name);
+            const err = opts.deleteConnectionError?.(name);
+            if (err) throw new Error(err);
+            calls.deletedConnections.push({ environmentId, connector, name });
+            deletedConnections.add(name);
+        },
+        async copyText(text) {
+            calls.copied.push(text);
         },
         async create(_entity, record) {
             await opts.beforeCreate?.();

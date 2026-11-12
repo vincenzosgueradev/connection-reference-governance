@@ -25,7 +25,10 @@ describe('actionRunning', () => {
 describe('the rule is applied in one place', () => {
     it('views/main.ts applies it after each draw and no other view disables buttons for it', () => {
         expect(read('src/views/main.ts')).toMatch(/actionRunning\(store\.get\(\)\)/);
-        expect(read('src/views/main.ts')).toMatch(/querySelectorAll<HTMLButtonElement>\('button'\)\.forEach\(b => \{ b\.disabled = true; \}\)/);
+        // the one exception is the Cancel of Check all (feature 024), marked in its own view and nowhere else
+        expect(read('src/views/main.ts')).toMatch(/querySelectorAll<HTMLButtonElement>\('button'\)\.forEach\(b => \{ if \(b\.dataset\['allowRunning'\] !== 'true'\) b\.disabled = true; \}\)/);
+        expect(read('src/views/connectionsManager.ts').match(/dataset\['allowRunning'\] = 'true'/g)).toHaveLength(1);
+        for (const f of ['cleanup', 'newReference', 'dependencies', 'connectionDeletion', 'removal', 'confirm']) expect(read(`src/views/${f}.ts`), f).not.toMatch(/allowRunning/);
         for (const f of ['cleanup', 'newReference', 'dependencies']) expect(read(`src/views/${f}.ts`), f).not.toMatch(/actionRunning|loading > 0 \? .*disabled|\.disabled = .*loading/);
     });
     it('the constitution states it, and the focus is protected by other means (given only when a dialog opens, without scrolling)', () => {
