@@ -16,13 +16,30 @@ export function connectorTile(connectorId: string, missing = false, small = fals
     return tile;
 }
 
-/** The connection id in full (it wraps), or a warning when none is set. */
-export function connectionChip(connectionId: string): HTMLElement {
-    if (connectionId === '') return chip('No connection', 'warning', 'alert-triangle');
+/**
+ * The connection id in full (it wraps), or a warning when none is set. With `onOpen` the chip is a real button that opens
+ * the Connections area on that connection (feature 024); a reference with no connection has nothing to open and says why.
+ */
+export function connectionChip(connectionId: string, onOpen?: () => void): HTMLElement {
+    if (connectionId === '') {
+        const none = chip('No connection', 'warning', 'alert-triangle');
+        if (onOpen) none.title = 'This reference has no connection, so there is nothing to open.';
+        return none;
+    }
     const c = chip(connectionId, 'neutral', 'link');
     c.classList.add('chip--code', 'conn-id');
     c.title = connectionId;
-    return c;
+    if (!onOpen) return c;
+    const link = el('button', 'conn-link');
+    link.type = 'button';
+    link.title = `Open this connection in Connections: ${connectionId}`;
+    link.setAttribute('aria-label', `Open the connection ${connectionId} in Connections`);
+    link.append(c);
+    link.addEventListener('click', e => {
+        e.stopPropagation(); // the row must not open or close
+        onOpen();
+    });
+    return link;
 }
 
 /** The official connector name, with a chip when the reference uses a custom connector. */

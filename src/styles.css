@@ -118,9 +118,6 @@
 .ref-list { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 
 /* Retyle of the dialogs: a calm accent, a button that reads as an action and a disabled one that reads as unavailable. */
-.modal-actions .btn--danger:not(:disabled) { background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 60%, var(--color-info))); border-color: transparent; color: var(--color-on-primary); font-weight: 600; box-shadow: 0 4px 14px color-mix(in srgb, var(--color-primary) 35%, transparent); }
-.modal-actions .btn--danger:not(:disabled):hover { filter: brightness(1.1); border-color: transparent; }
-.modal-actions .btn--danger:disabled { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-muted); opacity: 1; }
 .confirm-dialog { width: min(1040px, 100%); }
 .confirm-dialog.is-expanded { width: 100%; }
 
@@ -222,9 +219,6 @@
 }
 
 /* Delete in the action bar: a solid red of the error token (the shared kit's danger button is only red text) */
-.action-strip .btn--danger:not(:disabled) { background: var(--color-error); border-color: var(--color-error); color: var(--color-bg); font-weight: 600; }
-.action-strip .btn--danger:not(:disabled):hover { filter: brightness(1.12); }
-.action-strip .btn--danger:disabled { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text-muted); opacity: 0.7; }
 
 /* the studio bar holds only where you are: the pipeline moves between categories */
 .studio-nav { grid-template-columns: minmax(0, 1fr); }
@@ -276,8 +270,6 @@
 .preview-summary { flex: 1 1 auto; color: var(--color-text-muted); font-size: var(--fs-sm); }
 
 /* Delete: a solid red wherever it is the main button of a bar */
-.step-footer .btn--danger:not(:disabled) { background: var(--color-error); border-color: var(--color-error); color: var(--color-bg); font-weight: 600; }
-.step-footer .btn--danger:not(:disabled):hover { filter: brightness(1.12); }
 
 /* The confirmation keeps its buttons at the bottom whatever the height of the dialog */
 .confirm-dialog .modal-body { flex: 1 1 auto; }
@@ -566,3 +558,264 @@
 .used-link:hover { text-decoration: underline; }
 .used-link.muted { color: var(--color-text-muted); }
 .used-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ---- The Connections area (feature 024). Theme variables only; stays usable down to 640 px without a page scroll. ---- */
+/* the two areas: tabs, so they never look like the filters below them */
+.area-switch { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--color-border); }
+.area-tab { display: inline-flex; align-items: center; gap: var(--sp-2); margin-bottom: -1px; padding: var(--sp-2) var(--sp-4); border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-text-muted); font: inherit; font-weight: 600; cursor: pointer; }
+.area-tab:hover { color: var(--color-text-strong); }
+.area-tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+.area-tab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+.cm-screen { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.cm-screen > :not(.table-wrap) { flex: none; }
+.cm-screen > .area-switch { margin-bottom: 0; }
+.cm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.cm-toolbar .search-box { flex: 1 1 220px; }
+.cm-select { flex: 0 1 200px; min-width: 150px; }
+.cm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.cm-selected, .cm-checked { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.cm-checked { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.cm-info { display: inline-flex; color: var(--color-text-muted); cursor: help; border-radius: 999px; }
+.cm-info:hover, .cm-info:focus-visible { color: var(--color-text-strong); }
+.cm-info:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.cm-wait, .cm-failed { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-5) 0; }
+.cm-checkall-text { margin: 0; color: var(--color-text-muted); font-size: var(--fs-sm); }
+/* Check all as a pipeline: the apps, the references, then one block per connector with its logo */
+.cm-pipe { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.cm-stages { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.cm-stage-arrow { color: var(--color-text-muted); flex: none; }
+.cm-blocks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--sp-2); }
+.cm-block { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; align-items: center; column-gap: var(--sp-3); row-gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-2); min-width: 0; }
+.cm-block > .conn-tile { grid-row: 1; }
+.cm-block-text { min-width: 0; }
+.cm-block-name { font-size: var(--fs-sm); font-weight: 600; color: var(--color-text-strong); overflow-wrap: anywhere; }
+.cm-block-sub { font-size: var(--fs-xs); color: var(--color-text-muted); }
+.cm-block-mark { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; color: var(--color-text-muted); }
+.cm-dot { width: 8px; height: 8px; border: 2px solid var(--color-text-muted); border-radius: 50%; opacity: 0.6; }
+.cm-block-bar { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--color-surface); border: 1px solid var(--color-border); overflow: hidden; }
+.cm-block-fill { display: block; height: 100%; width: 0; background: var(--color-primary); transition: width 0.2s ease; }
+.cm-block.is-active { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary), 0 0 14px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+.cm-block.is-active .cm-block-mark { color: var(--color-primary); }
+.cm-block.is-done { border-color: color-mix(in srgb, var(--color-success) 55%, var(--color-border)); background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface-2)); }
+.cm-block.is-done .cm-block-mark { color: var(--color-success); }
+.cm-block.is-done .cm-block-fill { background: var(--color-success); }
+.cm-block.is-pending { opacity: 0.7; }
+@media (prefers-reduced-motion: reduce) { .cm-block-fill { transition: none; } .cm-block.is-active { box-shadow: none; border-width: 2px; } }
+.cm-progress { position: relative; height: 6px; border-radius: 999px; overflow: hidden; background: var(--color-surface-2); border: 1px solid var(--color-border); }
+.cm-progress-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--color-primary); transition: width 0.2s ease; }
+.cm-progress--wait .cm-progress-fill { width: 35%; animation: newref-slide 1.1s ease-in-out infinite; background: linear-gradient(90deg, transparent, var(--color-primary), transparent); }
+@media (prefers-reduced-motion: reduce) { .cm-progress-fill { transition: none; } .cm-progress--wait .cm-progress-fill { animation: none; width: 100%; opacity: 0.6; } }
+
+/* the list: one row is one line; the header sorts */
+.cm-list { background: var(--color-surface); }
+.cm-head, .cm-row { display: grid; grid-template-columns: 32px 28px minmax(0, 1fr) 170px 220px 120px 36px; align-items: center; column-gap: var(--sp-4); padding: 0 var(--sp-4) 0 var(--sp-3); }
+.cm-head { position: sticky; top: 0; z-index: 1; min-height: 36px; background: var(--color-surface-2); border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.cm-head-plain { padding: var(--sp-1) 0; }
+.cm-sort { display: inline-flex; align-items: center; gap: var(--sp-1); width: fit-content; padding: var(--sp-1) 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.cm-sort:hover, .cm-sort.is-active { color: var(--color-text-strong); }
+.cm-sort:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.cm-sort-arrow { transition: transform 0.12s; }
+.cm-sort-arrow.is-asc { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .cm-sort-arrow { transition: none; } }
+.cm-item + .cm-item { border-top: 1px solid var(--color-border); }
+.cm-row { min-height: 48px; cursor: pointer; border-left: 3px solid transparent; }
+.cm-row:hover, .cm-item.is-open > .cm-row { background: var(--color-surface-2); }
+.cm-row--error { border-left-color: var(--color-error); }
+.cm-row--reconnect { border-left-color: var(--color-warning); }
+.cm-cell { min-width: 0; display: flex; align-items: center; gap: var(--sp-2); }
+/* a chip never reaches into the next column: it wraps inside its own */
+.cm-cell .chip { max-width: 100%; white-space: normal; text-align: left; }
+.cm-cell--who { gap: var(--sp-3); }
+.cm-cell--when { flex-direction: column; align-items: flex-start; gap: 0; font-size: var(--fs-sm); color: var(--color-text-muted); }
+.cm-creator { font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.cm-names { min-width: 0; flex: 1 1 auto; }
+.cm-names .conn-name { overflow-wrap: anywhere; }
+.cm-sub { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); min-width: 0; font-size: var(--fs-xs); color: var(--color-text-muted); }
+.cm-connector { overflow-wrap: anywhere; }
+.cm-id { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.cm-unchecked { color: var(--color-text-muted); font-size: var(--fs-xs); opacity: 0.7; }
+.cm-chevron { transition: transform 0.12s; }
+.cm-item.is-open .cm-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .cm-chevron { transition: none; } }
+.cm-check:disabled { opacity: 0.4; cursor: not-allowed; }
+.cm-detail { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) var(--sp-4) calc(32px + 28px + var(--sp-3) + var(--sp-4) * 2); background: var(--color-surface-2); border-top: 1px dashed var(--color-border); }
+.cm-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-1) var(--sp-4); margin: 0; font-size: var(--fs-sm); }
+.cm-facts dt { color: var(--color-text-muted); }
+.cm-facts dd { margin: 0; overflow-wrap: anywhere; }
+.cm-portal { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.cm-portal-hint { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.cm-verdict--none-found { color: var(--color-success); }
+.cm-verdict--unchecked-source { color: var(--color-warning); }
+/* in a column the base `.dep-source` (flex: 1 1 18em, made for a row) would grow tall and leave a blank gap */
+.cm-coverage { margin: 0; flex: none; }
+.dep-title { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; flex: 1 1 auto; }
+.dep-title .icon { flex: none; }
+.cm-more { display: block; margin: var(--sp-3) auto; }
+.cm-deletion .cm-progress { margin: var(--sp-3) 0 var(--sp-2); }
+
+@media (max-width: 900px) {
+    .cm-head { display: none; }
+    .cm-row { grid-template-columns: 32px 28px minmax(0, 1fr); padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+    .cm-cell--status, .cm-cell--dep, .cm-cell--when { grid-column: 3; }
+    .cm-cell--link { grid-column: 3; }
+    .cm-detail { padding-left: var(--sp-4); }
+}
+
+/* A connection chip that opens the connection in the Connections area (feature 024). */
+.conn-link { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; border-radius: 999px; text-align: left; max-width: 100%; }
+.conn-link:hover .chip { border-color: var(--color-primary); }
+.conn-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* The final button of a dangerous dialog is a little stronger than the others, still dark: a red edge and strong text */
+.modal-actions .btn--danger:not(:disabled) { background: color-mix(in srgb, var(--color-error) 22%, var(--color-surface-2)); color: var(--color-text-strong); border-color: var(--color-error); font-weight: 600; }
+.modal-actions .btn--danger:not(:disabled):hover { background: color-mix(in srgb, var(--color-error) 32%, var(--color-surface-2)); }
+
+/* Check all: a slim line of steps and one block, the connector being read now */
+.cm-pipe { gap: var(--sp-2); padding: var(--sp-3); }
+.cm-steps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); font-size: var(--fs-xs); color: var(--color-text-muted); }
+.cm-step { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.cm-step.is-active { color: var(--color-text-strong); font-weight: 600; }
+.cm-step.is-done { color: var(--color-success); }
+.cm-pipe .cm-block { max-width: 320px; box-shadow: none; }
+.cm-pipe .cm-block.is-active { box-shadow: none; }
+.cm-pipe.run-panel { padding: var(--sp-4); }
+
+/* The live log of a deletion */
+.cm-runlog-head { margin-top: var(--sp-3); }
+.cm-runlog { max-height: 150px; overflow-y: auto; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font: var(--fs-xs)/1.6 ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.cm-runlog-line { display: flex; gap: var(--sp-3); }
+.cm-runlog-time { flex: none; color: var(--color-text-muted); }
+.cm-runlog-text { min-width: 0; overflow-wrap: anywhere; color: var(--color-text); }
+.cm-runlog-line--success .cm-runlog-text { color: var(--color-success); }
+.cm-runlog-line--warning .cm-runlog-text { color: var(--color-warning); }
+.cm-runlog-line--error .cm-runlog-text { color: var(--color-error); }
+
+.cm-now-connector { display: flex; align-items: center; gap: var(--sp-2); margin: var(--sp-1) 0; }
+.cm-now-text { display: flex; flex-direction: column; font-size: var(--fs-xs); color: var(--color-text-muted); }
+.cm-now-text b { font-size: var(--fs-sm); color: var(--color-text-strong); }
+
+/* Numbers that read at a glance: tabular figures, a tint and an accent line per counter, a quiet gradient on the percentage */
+.run-percent { font-weight: 800; letter-spacing: -0.02em; background: linear-gradient(180deg, var(--color-text-strong), color-mix(in srgb, var(--color-primary) 70%, var(--color-text-strong))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.run-count { position: relative; overflow: hidden; }
+.run-count::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--color-border); }
+.run-count b { font-size: var(--fs-xl); font-weight: 800; letter-spacing: -0.02em; font-feature-settings: 'tnum'; }
+.run-count--done { background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface)); }
+.run-count--done::before { background: var(--color-success); }
+.run-count--skipped { background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface)); }
+.run-count--skipped::before { background: var(--color-warning); }
+.run-count--failed { background: color-mix(in srgb, var(--color-error) 7%, var(--color-surface)); }
+.run-count--failed::before { background: var(--color-error); }
+.run-count--done:has(b:is(:empty)), .run-count b { transition: color 0.2s ease; }
+.cm-now-text b { font-size: var(--fs-md, var(--fs-sm)); }
+.cm-now-text span { font-feature-settings: 'tnum'; font-weight: 600; color: var(--color-primary); }
+/* In a dialog the hero is narrower: the phases and the counters take a row of their own, never a squeezed column */
+.cm-deletion .run-hero { grid-template-columns: auto minmax(0, 1fr); }
+.cm-deletion .run-phases, .cm-deletion .run-counters { grid-column: 1 / -1; }
+.cm-deletion .run-counters { justify-content: center; }
+
+/* The dialog of a deletion keeps one size from Preview to Result: the same width, the title block and the log with a fixed height */
+.cm-deletion .modal { width: min(960px, 96vw); }
+.cm-deletion .run-titles { min-height: 104px; }
+.cm-deletion .cm-runlog { height: 190px; max-height: none; }
+.cm-deletion .run-now { min-height: 2.6em; }
+
+.cm-portal-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); max-height: 180px; overflow-y: auto; }
+.cm-portal-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-1) 0; }
+.cm-portal-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--color-text-strong); font-weight: 600; }
+.cm-portal-hint { display: block; margin-top: 2px; font-weight: 400; font-size: var(--fs-xs); color: var(--color-text-muted); }
+
+/* The confirmation in the portal: a list with room, a square box that shows a tick, and a word for the state */
+.cm-portal-list { max-height: 300px; gap: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.cm-portal-item { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--color-border); }
+.cm-portal-item:last-child { border-bottom: 0; }
+.cm-portal-pick { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; padding: var(--sp-1) 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cm-portal-pick:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.cm-portal-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 2px solid var(--color-text-muted); border-radius: var(--radius-sm); background: var(--color-surface-2); color: var(--color-text-strong); }
+.cm-portal-pick:hover .cm-portal-box { border-color: var(--color-primary); }
+.cm-portal-pick.is-on .cm-portal-box { background: var(--color-success); border-color: var(--color-success); }
+.cm-portal-text { display: flex; flex-direction: column; min-width: 0; }
+.cm-portal-state { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.cm-portal-item:has(.cm-portal-pick.is-on) .cm-portal-state { color: var(--color-success); }
+
+/* The connector filter: every connector with its drawing and its count */
+.cm-picker { position: relative; flex: 0 1 240px; min-width: 190px; }
+.cm-picker-btn { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 6px var(--sp-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-strong); font: inherit; text-align: left; cursor: pointer; }
+.cm-picker-btn:hover { border-color: var(--color-primary); }
+.cm-picker-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.cm-picker-label { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.cm-picker-chevron { flex: none; color: var(--color-text-muted); }
+.cm-picker-list { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%; width: max-content; max-width: 360px; max-height: 340px; overflow-y: auto; padding: var(--sp-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text-strong) 18%, transparent); }
+.cm-picker-list[hidden] { display: none; }
+.cm-picker-opt { display: flex; align-items: center; gap: var(--sp-3); width: 100%; padding: var(--sp-1) var(--sp-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
+.cm-picker-opt:hover, .cm-picker-opt:focus-visible { background: var(--color-surface-2); outline: none; }
+.cm-picker-opt.is-on { background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)); color: var(--color-text-strong); font-weight: 600; }
+.cm-picker-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.cm-picker-count { flex: none; min-width: 28px; padding: 0 var(--sp-2); border-radius: 999px; background: var(--color-surface-2); color: var(--color-text-muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; text-align: center; }
+
+/* The filter bar, on one row: filters with an icon and a coloured count, a search that takes what is left, the connector, Refresh */
+.cm-toolbar { flex-wrap: nowrap; gap: var(--sp-3); padding: var(--sp-2); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.cm-toolbar .segmented { flex: none; border: 0; border-radius: 999px; background: var(--color-surface-2); padding: 3px; gap: 2px; overflow: visible; }
+.cm-toolbar .segment { gap: var(--sp-2); border: 0; border-radius: 999px; padding: 5px var(--sp-3); }
+.cm-toolbar .segment .icon { opacity: 0.85; }
+.cm-toolbar .segment.is-active { background: var(--color-primary); box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary) 45%, transparent); }
+.cm-toolbar .segment:not(.is-active):hover { background: color-mix(in srgb, var(--color-text-strong) 8%, transparent); }
+.cm-toolbar .segment:nth-child(2):not(.is-active) .icon, .cm-toolbar .segment:nth-child(2):not(.is-active) .segment-count { color: var(--color-error); }
+.cm-toolbar .segment:nth-child(3):not(.is-active) .icon, .cm-toolbar .segment:nth-child(3):not(.is-active) .segment-count { color: var(--color-success); }
+.cm-toolbar .segment:nth-child(4):not(.is-active) .icon, .cm-toolbar .segment:nth-child(4):not(.is-active) .segment-count { color: var(--color-info); }
+.cm-toolbar .segment:not(.is-active) .segment-count { background: color-mix(in srgb, currentColor 14%, transparent); font-weight: 700; }
+.cm-toolbar .search-box { flex: 1 1 140px; min-width: 120px; }
+.cm-toolbar .cm-picker { flex: 0 1 230px; min-width: 170px; }
+.cm-toolbar .cm-picker-btn { border-radius: 999px; background: var(--color-surface-2); padding: 4px var(--sp-3) 4px 5px; }
+.cm-toolbar > .btn { flex: none; border-radius: 999px; }
+@media (max-width: 1250px) { .cm-toolbar { flex-wrap: wrap; } .cm-toolbar .search-box { flex: 1 1 220px; } }
+
+/* A dialog badge is a quiet tile with a coloured drawing, in every dialog: the gradients of the kit are not used (they come later in the kit file than the calm rules) */
+.modal .modal-badge, .modal--primary .modal-badge, .modal--success .modal-badge, .modal--warning .modal-badge, .modal--error .modal-badge, .modal--info .modal-badge { background: var(--color-surface-2); border: 1px solid var(--color-border); box-shadow: none; }
+.modal--error .modal-badge { color: var(--color-error); }
+.modal--warning .modal-badge { color: var(--color-warning); }
+.modal--success .modal-badge { color: var(--color-success); }
+.modal--primary .modal-badge, .modal--info .modal-badge { color: var(--color-primary); }
+
+/* The deletion dialog, Preview: a summary, what goes, three steps. One surface, colour only where it means something. */
+.cm-deletion .modal-body { display: flex; flex-direction: column; gap: var(--sp-4); }
+.cm-del-summary { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--color-border); border-left: 3px solid var(--color-error); border-radius: var(--radius-md); background: var(--color-surface); }
+.cm-del-summary > .icon { flex: none; margin-top: 2px; color: var(--color-error); }
+.cm-del-summary-text { display: flex; flex-direction: column; gap: 2px; }
+.cm-del-summary-text strong { color: var(--color-text-strong); }
+.cm-del-summary-text span, .cm-del-blocked { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.cm-del-blocked { margin: 0; }
+.cm-del-block { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cm-del-title { margin: 0; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+.cm-del-list { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.cm-del-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--color-border); }
+.cm-del-item:last-child { border-bottom: 0; }
+.cm-del-item-text { display: flex; flex-direction: column; min-width: 0; }
+.cm-del-item-name { color: var(--color-text-strong); font-weight: 600; overflow-wrap: anywhere; }
+.cm-del-item-sub { color: var(--color-text-muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.cm-del-step { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.cm-del-step.is-done { border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
+.cm-del-step-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); }
+.cm-del-num { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--color-text-muted); color: var(--color-text-muted); font-size: var(--fs-sm); font-weight: 700; }
+.cm-del-step.is-done .cm-del-num { background: var(--color-success); border-color: var(--color-success); color: var(--color-text-strong); }
+.cm-del-step-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.cm-del-step-text strong { color: var(--color-text-strong); }
+.cm-del-step-hint { color: var(--color-text-muted); font-size: var(--fs-sm); }
+.cm-del-state { flex: none; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-muted); }
+.cm-del-step.is-done .cm-del-state { color: var(--color-success); }
+.cm-del-step-body { padding: 0 var(--sp-4) var(--sp-4); }
+.cm-del-step .cm-portal-list { max-height: 240px; }
+
+/* The action bar: the same rounded bar as the filter bar, pill buttons, the selection as a pill, the reading figure on the right */
+.cm-actions { flex-wrap: nowrap; gap: var(--sp-3); padding: var(--sp-2); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.cm-actions > .btn { flex: none; border-radius: 999px; padding-inline: var(--sp-4); }
+.cm-actions > .btn--primary:not(:disabled) { box-shadow: 0 1px 4px color-mix(in srgb, var(--color-primary) 40%, transparent); }
+.cm-actions .cm-selected { flex: none; display: inline-flex; align-items: center; padding: 4px var(--sp-3); border-radius: 999px; background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cm-actions .cm-selected:not(:only-child) { color: var(--color-text-strong); }
+.cm-actions .btn--sm, .cm-actions > .btn.btn--sm { padding-inline: var(--sp-3); }
+.cm-actions .cm-checked { flex: none; }
+@media (max-width: 1250px) { .cm-actions { flex-wrap: wrap; } }
+
+/* The toggle keeps its shape in any row: it never shrinks (a squeezed track pushed the knob over its edge), the knob stays a circle */
+.toggle { flex: none; box-sizing: border-box; min-width: 66px; }
+.toggle::after { flex: none; box-sizing: border-box; min-width: 18px; min-height: 18px; aspect-ratio: 1 / 1; }

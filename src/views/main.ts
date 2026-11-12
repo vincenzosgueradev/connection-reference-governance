@@ -18,9 +18,13 @@ import { actionRunning } from '../state/running';
 import { cleanupFigures } from '../model/cleanup';
 import { removalModal } from './removal';
 import { flowDetail, referenceDetail, stateChip, typeChip } from './detail';
+import type { ConnectionsHandlers } from './connectionsHandlers';
+import { areaSwitch, connectionsManager } from './connectionsManager';
 
 /** DOM only, built with the shared UI kit. Decisions are in model/ and services/; user intent goes out through `Handlers`. */
 export interface Handlers {
+    /** The Connections area (feature 024). Optional: the area switch is shown only when it is given. */
+    connections?: ConnectionsHandlers;
     /** An empty id means "back to the list of solutions". */
     selectSolution(id: string): void;
     refresh(): void;
@@ -64,8 +68,15 @@ function nameWithIcon(name: string): HTMLElement {
 
 const SORT_COLUMNS: readonly SolutionSortKey[] = ['name', 'flows', 'created'];
 
+/** Switches the area: the Connections area reads its list on entry (Principle VII); the solutions are only shown again. */
+function pickArea(store: Store, h: Handlers, area: 'solutions' | 'connections'): void {
+    if (area === 'connections') void h.connections?.open();
+    else store.dispatch({ type: 'setArea', area });
+}
+
 function solutionList(s: State, store: Store, h: Handlers): HTMLElement {
     const root = el('div', 'screen');
+    if (h.connections) root.append(areaSwitch(s, area => pickArea(store, h, area)));
     const unmanaged = s.solutions.filter(sol => !sol.managed);
     const managed = s.solutions.length - unmanaged.length;
     root.append(hero(
@@ -201,7 +212,7 @@ function referencesTable(s: State, store: Store, h: Handlers): { table: HTMLElem
             });
             const owner = el('span', 'cell-muted', ref.ownerName || 'Unknown');
             owner.title = 'The owner of the connection reference row, not of the connection behind it.';
-            const cells = [referenceCell(ref, ref.logicalName), connectorName(ref.connectorId, ref.customConnectorId !== ''), connectionChip(ref.connectionId), owner, used];
+            const cells = [referenceCell(ref, ref.logicalName), connectorName(ref.connectorId, ref.customConnectorId !== ''), connectionChip(ref.connectionId, h.connections ? () => void h.connections!.openConnection(ref.connectionId) : undefined), owner, used];
             return attention ? [...cells, flagChips(r.flags)] : cells;
         },
         detail: r => referenceDetail(r, snap.flows, { state: s.dependencies[r.reference.id], onCheck: () => void h.checkDependencies([r.reference.id]) }),
@@ -351,8 +362,20 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const crumbs = document.getElementById('breadcrumb');
         if (crumbs) {
             crumbs.replaceChildren();
-            crumbs.hidden = s.solutionId === '';
-            if (s.solutionId !== '') {
+            const inConnections = s.area === 'connections' && h.connections !== undefined;
+            crumbs.hidden = s.solutionId === ''; // in the Connections area from the home the tabs already say where we are
+            if (inConnections && s.solutionId !== '') {
+                const solutionName = s.solutionId === '' ? '' : s.snapshot?.solution.name ?? s.solutions.find(x => x.id === s.solutionId)?.name ?? '';
+                const leave = () => {
+                    h.connections!.backToSolutions();
+                    h.selectSolution('');
+                };
+                crumbs.append(...breadcrumb([
+                    { label: 'Solutions', onClick: leave },
+                    ...(solutionName === '' ? [] : [{ label: solutionName, onClick: () => h.connections!.backToSolutions() }]),
+                    { label: 'Connections' },
+                ]).childNodes);
+            } else if (!inConnections && s.solutionId !== '') {
                 const name = s.snapshot?.solution.name ?? s.solutions.find(x => x.id === s.solutionId)?.name ?? '';
                 const w = removalDialogOpen(s) ? null : s.wizard;
                 // During the write nothing can be left; before it, going back to the solution discards the plan.
@@ -372,6 +395,10 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
             m.append(el('span', 'message-text', s.error));
             root.append(m);
         }
+        if (s.area === 'connections' && h.connections) {
+            root.append(connectionsManager(s, store, h.connections, area => pickArea(store, h, area), environment()));
+            return;
+        }
         if (s.solutionId === '') {
             root.append(solutionList(s, store, h));
             return;
@@ -388,7 +415,7 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
     const pageKey = (): string => {
         const s = store.get();
         const w = s.wizard;
-        return [s.solutionId, s.snapshot === null ? 'loading' : s.view, w ? `${w.step}:${w.operation}:${w.tab}` : '', removalDialogOpen(s) ? 'removal' : ''].join('|');
+        return [s.area === 'connections' && h.connections ? 'connections' : '', s.solutionId, s.snapshot === null ? 'loading' : s.view, w ? `${w.step}:${w.operation}:${w.tab}` : '', removalDialogOpen(s) ? 'removal' : ''].join('|');
     };
     const render = () => {
         const key = pageKey();
@@ -399,6 +426,9 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const wrapTop = root.querySelector<HTMLElement>('.table-wrap')?.scrollTop ?? 0;
         const modalTops = [...root.querySelectorAll<HTMLElement>('.modal-body')].map(b => b.scrollTop); // one per dialog (two can be stacked)
         const stepTop = root.querySelector<HTMLElement>('.step-body')?.scrollTop ?? 0;
+        // the inner lists of the deletion dialog (what goes, the portal confirmation) keep their place on every tick and every toggle
+        const innerLists = '.cm-del-list, .cm-portal-list';
+        const innerTops = [...root.querySelectorAll<HTMLElement>(innerLists)].map(l => [l.className, l.scrollTop] as const);
         const dialogsBefore = root.querySelectorAll('.modal-overlay').length; // the dialogs that were already open (two can be stacked)
         const paneTops = [...root.querySelectorAll<HTMLElement>('.studio-pane-body')].map(p => p.scrollTop);
         const cleanBody = root.querySelector<HTMLElement>('.cleanup-content');
@@ -415,13 +445,14 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         // the global rule: while an action runs every button is disabled, here, once, whatever drew it (constitution T8)
         const running = actionRunning(store.get());
         root.classList.toggle('is-running', running);
-        if (running) root.querySelectorAll<HTMLButtonElement>('button').forEach(b => { b.disabled = true; });
+        if (running) root.querySelectorAll<HTMLButtonElement>('button').forEach(b => { if (b.dataset['allowRunning'] !== 'true') b.disabled = true; }); // Cancel of Check all is the one exception
         if (page) page.scrollTop = samePage ? pageTop : 0;
         const wrap = root.querySelector<HTMLElement>('.table-wrap');
         if (wrap) wrap.scrollTop = samePage ? wrapTop : 0;
         const stepBody = root.querySelector<HTMLElement>('.step-body');
         if (stepBody) stepBody.scrollTop = samePage ? stepTop : 0;
         root.querySelectorAll<HTMLElement>('.modal-body').forEach((b, i) => { b.scrollTop = modalTops[i] ?? 0; });
+        root.querySelectorAll<HTMLElement>(innerLists).forEach(l => { l.scrollTop = innerTops.find(([cls]) => cls === l.className)?.[1] ?? 0; });
         // a re-draw of an open studio is not an opening: no animation, and the lists stay where they were
         // a redraw is not an opening: every dialog that was already open keeps still; only one that has just opened animates
         root.querySelectorAll('.modal-overlay').forEach((o, i) => { if (i < dialogsBefore) o.classList.add('no-anim'); });
