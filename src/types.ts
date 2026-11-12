@@ -168,3 +168,38 @@ export interface RowOutcome {
     /** Only for a flow the tool turned off: it is on again, or it was left off (feature 011). */
     readonly stateChange?: 'back-on' | 'left-off';
 }
+
+/** The state of a connection as the list reports it (feature 024). `unknown` is what is shown when the answer does not say. */
+export type ConnectionStatus = 'connected' | 'error' | 'reconnect' | 'unknown';
+
+/** A connection of the environment with what the list says about it (feature 024). Absent fields are empty strings, never guessed. */
+export interface ConnectionRow {
+    /** The connection name: the value a reference stores in `connectionid`. The key everywhere. */
+    readonly name: string;
+    /** Connector key without the `shared_` prefix; empty when the id did not give it. */
+    readonly connectorKey: string;
+    /** The connector as the tool names it (falls back to the key). */
+    readonly connectorName: string;
+    readonly displayName: string;
+    readonly status: ConnectionStatus;
+    /** The message of the status when it carries one. Shown on screen only (T7). */
+    readonly statusDetail: string;
+    readonly createdTime: string;
+    readonly modifiedTime: string;
+    /** Who created it. On screen only (T7); the email never goes into the backup. */
+    readonly creator: { readonly name: string; readonly email: string };
+}
+
+/** Something that needs a connection, found by one of the sources (feature 024). */
+export interface ConnectionDependent {
+    readonly kind: 'app' | 'flow' | 'reference' | 'agent' | 'other';
+    readonly id: string;
+    readonly name: string;
+    /** On, Off, Suspended, or empty when not read. */
+    readonly state: string;
+    readonly ownerName: string;
+    /** Names of the solutions that hold it; empty for an app or a flow outside any solution. */
+    readonly solutions: readonly string[];
+    /** For a flow or an agent found through a reference: the name of that reference. */
+    readonly via: string;
+}

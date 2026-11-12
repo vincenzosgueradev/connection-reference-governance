@@ -1,5 +1,5 @@
-import { connectorKey } from './connectors';
-import type { LiveConnection } from '../types';
+import { connectorInfo, connectorKey } from './connectors';
+import type { ConnectionRow, ConnectionStatus, LiveConnection } from '../types';
 
 /**
  * The connections of the connected environment as the Power Platform API lists them (Connectivity, "List connections",
@@ -68,4 +68,67 @@ export function verifyConnection(live: LiveState, connectorId: string, name: str
 export function connectionsOf(live: LiveState, connectorId: string): LiveConnection[] {
     const wanted = connectorKey(connectorId).toLowerCase();
     return live.items.filter(c => c.connectorKey === wanted);
+}
+
+// ---- the richer reading of feature 024 -------------------------------------------------------------------------------
+
+/** Words by which the service says that a connection must be signed in again (matched without case). */
+const RECONNECT_WORDS = /unauthenticated|reconnect|re-?authenticat|sign in again|expired/i;
+
+/**
+ * The status of a connection from `properties.statuses`. Connected only when the list is not empty and every entry says
+ * so; Needs reconnect when an entry says the connection must be signed in again; Error when an entry reports an error;
+ * otherwise unknown. Never a guess: a shape that is not understood is `unknown`, not `connected`.
+ */
+export function statusOf(statuses: unknown): { status: ConnectionStatus; detail: string } {
+    if (!Array.isArray(statuses) || statuses.length === 0) return { status: 'unknown', detail: '' };
+    let reconnect = '';
+    let error = '';
+    let allConnected = true;
+    for (const raw of statuses) {
+        const s = obj(raw);
+        const state = str(s['status']);
+        const err = obj(s['error']);
+        const text = [str(err['code']), str(err['message']), state].filter(t => t !== '').join(': ');
+        if (state.toLowerCase() !== 'connected') allConnected = false;
+        if (RECONNECT_WORDS.test(`${state} ${str(err['code'])} ${str(err['message'])}`)) reconnect = reconnect || text;
+        else if (/error/i.test(state) || Object.keys(err).length > 0) error = error || text;
+    }
+    if (reconnect !== '') return { status: 'reconnect', detail: reconnect };
+    if (error !== '') return { status: 'error', detail: error };
+    return allConnected ? { status: 'connected', detail: '' } : { status: 'unknown', detail: '' };
+}
+
+/** The connections with what the list says about each one. Fields the answer does not carry are empty. */
+export function parseConnectionRows(res: unknown): ConnectionRow[] {
+    return listOf(res).flatMap(raw => {
+        const c = obj(raw);
+        const name = str(c['name']);
+        if (name === '') return [];
+        const props = obj(c['properties']);
+        const key = connectorKeyOfConnection(str(c['id'])) || connectorKey(str(props['apiId']));
+        const by = obj(props['createdBy']);
+        const { status, detail } = statusOf(props['statuses']);
+        return [{
+            name,
+            connectorKey: key,
+            connectorName: key === '' ? '' : connectorInfo(`shared_${key}`).name,
+            displayName: str(props['displayName']),
+            status,
+            statusDetail: detail,
+            createdTime: str(props['createdTime']),
+            modifiedTime: str(props['lastModifiedTime']),
+            creator: { name: str(by['displayName']) || str(by['userPrincipalName']), email: str(by['email']) },
+        }];
+    });
+}
+
+/** The token of the next page, or an empty string at the last page (`nextLink`, however the host wrapped it). */
+export function nextOf(res: unknown): string {
+    const r = obj(res);
+    for (const candidate of [r['nextLink'], obj(r['data'])['nextLink'], obj(r['body'])['nextLink'], r['@odata.nextLink']]) {
+        const v = str(candidate).trim();
+        if (v !== '') return v;
+    }
+    return '';
 }

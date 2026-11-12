@@ -37,6 +37,20 @@ function definitions(host: Host): Promise<ReadonlyMap<number, ComponentTypeInfo>
     return p;
 }
 
+/**
+ * What the naming code needs to know about "the open solution": its id and the ids of its members. The solution views
+ * pass the snapshot's (`scopeOfSnapshot`); the Connections area has no open solution and passes `noScope`, so nothing is
+ * marked as being inside it (feature 024).
+ */
+export interface Scope {
+    readonly solutionId: string;
+    readonly memberIds: ReadonlySet<string>;
+}
+
+export const noScope: Scope = { solutionId: '', memberIds: new Set() };
+
+export const scopeOfSnapshot = (snapshot: Snapshot): Scope => ({ solutionId: snapshot.solution.id.toLowerCase(), memberIds: new Set(Object.keys(snapshot.componentTypes)) });
+
 interface Named {
     readonly name: string;
     readonly state: string;
@@ -54,7 +68,7 @@ async function rowsById(host: Host, set: string, key: string, select: string, id
 }
 
 /** Names, kinds, states, owners and solutions for components known by id and type. Notes collect what could not be read. */
-async function resolve(host: Host, snapshot: Snapshot, raw: readonly { id: string; type: number }[], found: ReadonlyMap<string, Named & { type: number }>, notes: string[]): Promise<ResolvedDependent[]> {
+async function resolve(host: Host, scope: Scope, raw: readonly { id: string; type: number }[], found: ReadonlyMap<string, Named & { type: number }>, notes: string[]): Promise<ResolvedDependent[]> {
     const read = await definitions(host);
     if (read === undefined && raw.some(d => infoOf(d.type) === undefined)) notes.push('The names of some component types could not be read.');
     const byId = new Map<string, { id: string; type: number }>();
@@ -148,17 +162,26 @@ async function resolve(host: Host, snapshot: Snapshot, raw: readonly { id: strin
             parent: n?.parentId ? botNames.get(n.parentId) ?? '' : '',
             solutions: solutionsRead ? [...(memberships.get(d.id) ?? [])].map(s => solutionNames.get(s)).filter((x): x is string => x !== undefined).sort() : [],
             // a member of the open solution is known from what was read for it; everything else is outside it
-            inOpenSolution: snapshot.componentTypes[d.id] !== undefined || memberships.get(d.id)?.has(snapshot.solution.id.toLowerCase()) === true,
+            inOpenSolution: scope.memberIds.has(d.id) || (scope.solutionId !== '' && memberships.get(d.id)?.has(scope.solutionId) === true),
         };
     });
 }
 
 /** Everything that depends on a reference, in any solution of the environment, plus the agents that use it. */
 export async function loadDependencyReport(host: Host, snapshot: Snapshot, reference: ConnectionReferenceRow): Promise<Result<DependencyReport>> {
-    const notes: string[] = [];
     try {
         const type = snapshot.componentTypes[reference.id.toLowerCase()] ?? await referenceComponentType(host, snapshot);
         if (type === undefined) return { ok: false, error: 'The component type of this reference could not be read, so its dependencies cannot be asked.' };
+        return await loadReferenceDependents(host, scopeOfSnapshot(snapshot), reference, type);
+    } catch (e) {
+        return { ok: false, error: message(e) };
+    }
+}
+
+/** The same, for a reference whose component type is known and with no need of an open solution (feature 024). */
+export async function loadReferenceDependents(host: Host, scope: Scope, reference: { readonly id: string }, type: number): Promise<Result<DependencyReport>> {
+    const notes: string[] = [];
+    try {
         const raw: Dependent[] = (await host.dependents(type, reference.id)).filter(d => GUID.test(d.id) && d.id.toLowerCase() !== reference.id.toLowerCase());
 
         // agents come from their documented relationships to the reference; each source can fail alone
@@ -179,7 +202,7 @@ export async function loadDependencyReport(host: Host, snapshot: Snapshot, refer
         const known = new Set(raw.map(d => d.id.toLowerCase()));
         for (const id of [...found.keys()]) if (known.has(id)) found.delete(id);
 
-        const items = await resolve(host, snapshot, raw, found, notes);
+        const items = await resolve(host, scope, raw, found, notes);
         return { ok: true, value: { items, notes: [...new Set(notes)] } };
     } catch (e) {
         return { ok: false, error: message(e) };
@@ -195,9 +218,36 @@ export async function dependentLabels(host: Host, snapshot: Snapshot, deps: read
     const valid = deps.filter(d => GUID.test(d.id));
     if (valid.length === 0) return out;
     try {
-        for (const d of await resolve(host, snapshot, valid, new Map(), [])) out[d.id] = describeDependent(d);
+        for (const d of await resolve(host, scopeOfSnapshot(snapshot), valid, new Map(), [])) out[d.id] = describeDependent(d);
     } catch {
         // the names are a convenience
     }
     return out;
+}
+
+/**
+ * The solutions that hold each component, by id (lower case); the default solutions are left out. Undefined when they
+ * cannot be read, so a caller says "not read" and never shows an empty list as if it were true (feature 024).
+ */
+export async function solutionsOfComponents(host: Host, ids: readonly string[]): Promise<ReadonlyMap<string, readonly string[]> | undefined> {
+    const valid = [...new Set(ids.map(i => i.toLowerCase()).filter(i => GUID.test(i)))];
+    const out = new Map<string, string[]>();
+    if (valid.length === 0) return out;
+    try {
+        const memberships = new Map<string, Set<string>>();
+        for (const part of chunks(valid)) {
+            for (const r of await host.query(`solutioncomponents?$select=objectid,_solutionid_value&$filter=${part.map(id => `objectid eq ${id}`).join(' or ')}`)) {
+                const o = str(r['objectid']).toLowerCase();
+                const s = str(r['_solutionid_value']).toLowerCase();
+                if (GUID.test(o) && GUID.test(s)) memberships.set(o, (memberships.get(o) ?? new Set()).add(s));
+            }
+        }
+        const names = new Map<string, string>();
+        for (const r of await rowsById(host, 'solutions', 'solutionid', 'friendlyname,uniquename', [...new Set([...memberships.values()].flatMap(s => [...s]))]))
+            if (!DEFAULT_SOLUTIONS.has(str(r['uniquename']).toLowerCase())) names.set(str(r['solutionid']).toLowerCase(), str(r['friendlyname']) || str(r['uniquename']));
+        for (const id of valid) out.set(id, [...(memberships.get(id) ?? [])].map(s => names.get(s)).filter((x): x is string => x !== undefined).sort());
+        return out;
+    } catch {
+        return undefined;
+    }
 }
