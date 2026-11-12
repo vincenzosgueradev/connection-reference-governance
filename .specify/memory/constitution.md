@@ -8,7 +8,9 @@ only adds to it. The `custom-*` skills come from the root template and are not e
 Makers and ALM owners need to know which connection reference every flow of a solution really uses, and to fix the
 ones left on a default or owned by the wrong person, without opening flows one by one. This tool lists the flows of an
 unmanaged solution in the connected environment, shows the connection references each flow uses and who owns the
-connection behind each one, flags the ones that need attention, and re-points them in bulk after a preview.
+connection behind each one, flags the ones that need attention, and re-points them in bulk after a preview. Since 1.9.0
+a second area, **Connections**, outside any solution, lists the connections of the environment that the signed-in user
+can see, shows what depends on each, and finds the ones nothing was found for (T11).
 
 ## Tool-specific rules
 
@@ -16,7 +18,9 @@ connection behind each one, flags the ones that need attention, and re-points th
 - Works on the connected environment only, through the Dataverse Web API (`dataverseAPI`). It never calls
   `api.flow.microsoft.com` (unsupported from PPTB). Since 1.6.0 it also reads, read only, the connections of the
   same environment through `powerplatformAPI.Connectivity` (List connections, Microsoft Learn), only to check that a
-  connection exists before a reference is created (T2c); the tool works without it.
+  connection exists before a reference is created (T2c); the tool works without it. Since 1.9.0 the same list and the
+  list of apps (`powerplatformAPI.PowerApps`) are also read, read only, by the Connections area (T11). The inventory (`powerplatformAPI.ResourceQuery`, one read only query sent with POST) is read
+  too, only as a hint of how many flows, apps and agents use a connector; it never decides anything and the tool works without it.
 - Works on **unmanaged** solutions only. Managed solutions are not offered: the home screen shows a disabled Managed
   tab with their count and says why, and they cannot be opened. The planners still refuse managed rows, as a second guard.
 - Desktop flows are out of scope and are not listed.
@@ -93,6 +97,35 @@ Each is its own plan/apply flow with its own preview. A single confirmation neve
   solution is read again (Principle VII). It informs; it never decides: Remove, Delete and merge keep their own rules
   (T2b, T2d). The report says that it comes from dependency tracking and so cannot see what is not tracked.
 
+### T11. Connections of the environment (added 1.9.0, feature 024)
+- An area of the tool outside the open solution. It lists the connections of the connected environment that the signed-in
+  user can see (never "all of the tenant"), read page by page from the Power Platform API (Connectivity, List
+  connections). The fields beyond `name`, `id`, `properties.displayName` and `properties.createdTime` (statuses, creator,
+  modified time, connector id) are read defensively: an absent field means unknown, never a guess, and a test pins the
+  words after the live check (T5, T2c).
+- What depends on a connection is read from official sources only: apps (Power Platform API, Power Apps, Get AdminApps,
+  `connectionReferences[].sharedConnectionId`), connection references, flows and agents (Dataverse, as T2e), flows
+  that hold the connection by name (when the environment accepts the search). The tool cannot read the records of the
+  flow service that the Maker portal shows as "Flows using this connection": seen on 2026-11-11, the portal listed 8
+  flows that no connection reference in Dataverse tied to the connection, and the Power Automate API (List Cloud Flows)
+  is refused to the toolbox (`ClientScopeAuthorizationFailed`: its application has no permission for it), so it is not
+  used. The text next to the verdict, the coverage note and the Preview of a deletion say so. A source is `ok`, `failed` or `not
+  scanned`. A connection is shown as **No dependency found** only when no source failed and nothing was found; the word
+  "unused" is never used for it, and a coverage note says what was and was not looked at (components the signed-in user
+  cannot read may still use it). A failed source, or a flow whose definition cannot be read, blocks selection.
+- Reading is read only, on request or when a row opens, with a visible wait (T8). Check all reads four connections at a
+  time, can be cancelled, and keeps what was read.
+- **Deleting a connection** follows T3 and T4b (plan, preview, confirmation with a one-time code and an acknowledgement,
+  backup, each row checked just before and read back after) but is behind the declared flag `connectionDelete` in
+  `src/features.ts`, which ships **off**. The official operation (Remove Connection as Admin) is not in the Power
+  Platform API that the toolbox exposes; the flag may be turned on only after a live test on a test connection is
+  recorded in `specs/024-connections-manager/research.md` ("Live check passed: <date>"), and a test fails if it is on
+  without that record. While it is off nothing in the area can write, and each connection offers **Copy portal address**.
+- The backup the user chooses to save holds, per connection, the name, connector, display name, creator name, created
+  time and status. It never holds an email or any secret.
+- Out of scope, always: changing the owner of a connection, creating, sharing or re-authenticating connections, editing
+  credentials, and repairing references that point at a deleted connection.
+
 ### T3. Plan, preview, confirm, apply (Principle V)
 - Every write is first built as a plan (pure, testable): which rows, which field, old value, new value.
 - The preview lists every row that will change and the number of flows affected. Nothing is written before the user
@@ -157,7 +190,9 @@ Every flag states the data it is based on. No flag is a guess.
   Fixtures are synthetic.
 - The tool stores nothing outside the PPTB session and sends nothing to any service other than the connected
   Dataverse environment and, read only and through PPTB, the Power Platform API of that environment (the list of
-  connections, T1). Names, ids and emails read are shown on screen only: never logged, saved or sent anywhere.
+  connections, T1; since 1.9.0 also the list of apps, T11). Names, ids and emails read are shown on screen only: never
+  logged, saved or sent anywhere, with one exception: the backup file that the user chooses to save before a deletion
+  (T2b, T11), which holds the records listed there and never an email.
 
 ### T8. UI
 - The main view is the flow list of the selected solution with one row per flow and its references; a second view groups
@@ -189,4 +224,4 @@ README, the specs, the research notes, the tests or the commit messages. A Credi
 or images are actually copied and a licence asks for it, and then only with the owner's written consent to be named.
 This tool copies nothing, so its README has no Credits section.
 
-**Version**: 1.8.2 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-07
+**Version**: 1.9.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-11
