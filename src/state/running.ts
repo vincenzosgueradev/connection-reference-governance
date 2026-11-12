@@ -11,5 +11,9 @@ export function actionRunning(s: State): boolean {
         || Object.values(s.dependencies).some(d => d.status === 'loading')
         || s.newReference?.saving === true
         || s.newReference?.live.status === 'loading'
-        || (s.wizard !== null && s.wizard.step === 'apply');
+        || (s.wizard !== null && s.wizard.step === 'apply')
+        || s.connections.list.status === 'loading'
+        || Object.values(s.connections.deps).some(d => d.status === 'loading')
+        || s.connections.checkAll !== null
+        || s.connections.deletion?.step === 'apply';
 }

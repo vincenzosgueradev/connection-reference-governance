@@ -14,6 +14,7 @@ import { log } from './services/log';
 import type { Store } from './state/store';
 import type { RowOutcome } from './types';
 import type { Handlers } from './views/main';
+import { createConnectionsController } from './controllerConnections';
 
 /** A short code to copy and paste, without the characters that are easy to mistake for each other. */
 function defaultCode(): string {
@@ -37,6 +38,8 @@ export function createController(
     let environment = '';
     let userId = '';
     let run: Promise<void> = Promise.resolve();
+    // the Connections area (feature 024) has its own controller; the views reach it through `connections`
+    const connections = createConnectionsController(host, store, clock, makeCode, () => environment);
 
     async function readSolutions(): Promise<void> {
         store.dispatch({ type: 'busy', busy: true });
@@ -165,7 +168,11 @@ export function createController(
 
     return {
         environment: () => environment,
-        idle: () => run,
+        connections,
+        idle: async () => {
+            await run;
+            await connections.idle();
+        },
         async start() {
             environment = await host.environmentName().catch(() => '');
             userId = await host.currentUserId().catch(() => '');

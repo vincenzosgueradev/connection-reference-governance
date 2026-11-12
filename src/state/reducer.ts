@@ -12,8 +12,11 @@ import { emptyForm, withChecked, withField, withPick, withSuggestion, type NewRe
 import type { LiveConnection } from '../types';
 import type { Verdict } from '../model/liveConnections';
 import type { ConnectionReferenceRow, Plan, RowOutcome, Snapshot, SolutionInfo } from '../types';
+import { connectionsStep, emptyConnections, isConnectionsAction, type ConnectionsAction, type ConnectionsState } from './connectionsState';
 
 export type ViewName = 'flows' | 'references';
+/** The two areas of the tool: the solutions, and the connections of the environment (feature 024). */
+export type AreaName = 'solutions' | 'connections';
 export type DiffLayout = 'split' | 'unified';
 /** The two views of the Preview: the code diff of every item, or one before-and-after table. */
 export type PreviewTab = 'diff' | 'table';
@@ -99,9 +102,15 @@ export interface State {
     readonly cleanupFollowUp: { readonly ids: readonly string[]; readonly keeper: string } | null;
     /** A Remove or a Delete was started from the clean up dialog: it opens again after the Result (feature 022). */
     readonly cleanupResume: boolean;
+    /** Which area is open (feature 024). */
+    readonly area: AreaName;
+    /** The Connections area: its list, filters, dependencies, selection and deletion. */
+    readonly connections: ConnectionsState;
 }
 
 export type Action =
+    | ConnectionsAction
+    | { type: 'setArea'; area: AreaName }
     | { type: 'busy'; busy: boolean }
     | { type: 'error'; message: string }
     | { type: 'solutionsLoaded'; solutions: readonly SolutionInfo[] }
@@ -209,6 +218,8 @@ export function initialState(): State {
         cleanupFollowUp: null,
         cleanupResume: false,
         dependencies: {},
+        area: 'solutions',
+        connections: emptyConnections(),
     };
 }
 
@@ -291,7 +302,12 @@ export function reducer(s: State, a: Action): State {
 }
 
 function step(s: State, a: Action): State {
+    if (isConnectionsAction(a)) return { ...s, connections: connectionsStep(s.connections, a) };
     switch (a.type) {
+        case 'setArea':
+            // the Connections area is left only when nothing is running there; a run owns the screen until its Result
+            if (a.area === 'solutions' && (s.connections.deletion?.step === 'apply' || s.connections.checkAll !== null)) return s;
+            return { ...s, area: a.area };
         case 'busy':
             return { ...s, busy: a.busy };
         case 'error':
