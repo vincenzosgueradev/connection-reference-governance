@@ -24,10 +24,13 @@ Also read `../../PPTB-PUBLISHING-RULES.md` before the first publish of a tool.
    - Working tree not clean: the published build would not match a commit. Ask the user to commit first (`/custom-commit`).
    - `V` is not greater than the version on npm: that number is taken. Say which is the highest and ask.
    - `V` is more than one step ahead of the npm version: ask whether it is intended.
+   - The newest `### x.y.z` heading under **Updates** in `README.md` is not `V`: the npm page shows the README packed in the version and it cannot be changed afterwards. Write the entry (from the changelog) and commit it first.
+   - The README body was not reviewed for `V`: the line `Page text reviewed for version V.` is missing or older, or an Added/Changed bullet of the changelog entry has no counterpart in Features, Usage or the limits section. Compare each bullet with the body, list the gaps, and stop until the README is updated and committed.
    - Not on `main`, or `main` has commits not on the remote: say so and ask.
 3. **Checks** - all must pass, report each in one line:
    - `npx tsc --noEmit`
    - `npm test`, then `npm run test:full`, then `npm run test:mutation` if `package.json` has that script (Principle VIII). Any failure, or a surviving mutation, is a stop; do not publish.
+   - **Before every release run ALL the checks in full, whatever changed** (decided by the author, 2026-11-07): `npm test`, `test:full` and the whole `test:mutation`, never a partial or `--changed-since` run. Never skip one because the code looks identical to the last release.
    - Every check the tool's `CLAUDE.md` lists under `## Extra checks` for a release (for example smoke scripts). If one needs an input that is not available, say it was skipped and why.
    - `npm run validate` (pptb-validate). If the binary is missing, say the validation gate could not be run and treat it as a stop.
 4. **Set the version** to `V` without touching git: `npm version <V> --no-git-tag-version`

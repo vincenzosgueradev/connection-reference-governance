@@ -17,7 +17,8 @@ intro, features, what it changes, installation, usage, privacy, credits, updates
 |---|---------|------|
 | 1 | **Title** (`#`) | The display name in `package.json`. No Microsoft product name as the tool's own brand. |
 | 2 | **Intro** | Two sentences at most: what the tool is and for whom; the gap it fills or, if inspired by another tool, that it is independent and not adapted or translated. Then one real screenshot with sample data (alt text says what is shown). |
-| 3 | **Features** | A short list of things the tool really does, each starting with a verb. |
+| 3 | **Features** | Every user-visible thing the tool really does, each bullet starting with a verb and saying what the person gains. Nothing the build does is left out (the page sells the tool), and nothing it does not do is claimed. |
+| 3b | **Screenshots** | Right after Features: a real screenshot or GIF for every feature, grouped by task, each with a one-line caption (what is shown, why it matters), strongest screen first, safeguards included. Full `raw.githubusercontent.com` URLs; sample data; URL, org, publisher and personal names blurred. A test checks every file of `docs/screenshots/` is used. |
 | 4 | **How this tool differs** | Only when it is inspired by or replaces another tool: what is different. Otherwise omitted. |
 | 5 | **What this tool changes** | Exactly this title (Marketplace Policy). What is read, what is written, and whether any environment is touched. |
 | 6 | **What it does not cover** | The limits, said plainly. |
@@ -127,7 +128,8 @@ The README Updates section is derived from it at release time, never the other w
 
 - [ ] Version in `package.json` = newest Updates entry = tag to be created.
 - [ ] The Updates entry is written from the changelog and every bullet passes section 4.
-- [ ] Every README heading (features, changes, does not cover, privacy) still matches the build.
+- [ ] Every README heading (features, changes, does not cover, privacy) still matches the build, and every Added/Changed bullet of the new changelog entry appears in the body, not only in Updates.
+- [ ] The line `Page text reviewed for version X.Y.Z.` (under the Updates heading) is the new version; a test checks it.
 - [ ] Screenshot shows the current version of the screen.
 - [ ] Every issue fixed in this version is named in the entry and will be closed with the version.
 - [ ] After `npm publish`: the tool's row in **My Tools** shows the new version (section 6); if not, **Trigger Update**.
