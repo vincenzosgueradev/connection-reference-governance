@@ -174,4 +174,4 @@ Full history: https://github.com/vincenzosgueradev/connection-reference-governan
 
 ## License
 
-MIT
+MIT. The full text is in https://github.com/vincenzosgueradev/connection-reference-governance/blob/main/LICENSE
