@@ -1031,7 +1031,7 @@ body {
 .diff-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: var(--fs-sm); line-height: 1.55; }
 .diff--split .diff-table col.c-no, .diff--unified .diff-table col.c-no { width: 46px; }
 .diff-no { padding: 0 8px; text-align: right; color: var(--color-text-muted); background: var(--diff-gutter); user-select: none; font-variant-numeric: tabular-nums; vertical-align: top; }
-.diff-code { position: relative; padding: 0 12px 0 24px; white-space: pre; vertical-align: top; color: var(--color-text); }
+.diff-code { position: relative; padding: 0 12px 0 24px; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; color: var(--color-text); }
 .diff--split .diff-code { width: 50%; }
 .diff-mark { position: absolute; left: 8px; user-select: none; font-weight: 700; }
 .diff-code--old { background: var(--diff-del-bg); }
