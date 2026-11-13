@@ -233,10 +233,24 @@ describe('solutions list and navigation', () => {
         const root = document.createElement('div');
         mountMain(root, store, handlers(), () => '');
         store.dispatch({ type: 'busy', busy: true });
-        expect(root.textContent).toContain('Loading solutions...');
+        expect(root.querySelector('.logo-loader')!.textContent).toBe('Reading the solutions...'); // feature 025
         store.dispatch({ type: 'solutionsLoaded', solutions: [sols[2]!] });
         store.dispatch({ type: 'busy', busy: false });
         expect(root.textContent).toContain('There are no unmanaged solutions in the connected environment.');
+        expect(root.querySelector('.logo-loader')).toBeNull(); // the animated logo is only for a real wait
+    });
+    it('a solution being read shows the animated logo; a failed read shows the error and no logo (feature 025)', () => {
+        document.body.innerHTML = '';
+        const store = createStore(initialState());
+        const root = document.createElement('div');
+        mountMain(root, store, handlers(), () => '');
+        store.dispatch({ type: 'solutionsLoaded', solutions: [sols[0]!] });
+        store.dispatch({ type: 'selectSolution', id: sols[0]!.id });
+        store.dispatch({ type: 'busy', busy: true });
+        expect(root.querySelector('.logo-loader')!.textContent).toBe('Reading the solution...');
+        store.dispatch({ type: 'busy', busy: false });
+        expect(root.querySelector('.logo-loader')).toBeNull();
+        expect(root.textContent).toContain('The solution could not be read.');
     });
     it('uses the shared kit for the controls (no browser checkbox, no emoji)', () => {
         const { root, store } = setup();

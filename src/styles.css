@@ -303,7 +303,7 @@
 .main-content { overflow: hidden; padding-bottom: 0; }
 #content { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .screen { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
-.screen > .hero, .screen > .toolbar { flex: none; }
+.screen > .hero, .screen > .toolbar, .screen > .area-switch { flex: none; }
 .screen > .table-wrap { flex: 1 1 auto; min-height: 0; max-height: none; }
 /* a solution: the panel keeps its header, toolbar and bar; the table takes the rest */
 .panel.screen { margin-bottom: 0; }
@@ -504,6 +504,7 @@
 .dup-effect { display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; font-size: var(--fs-sm); color: var(--color-text); overflow-wrap: anywhere; }
 .dup-effect .icon { flex: none; margin-top: 2px; }
 .dup-foot { display: flex; justify-content: flex-end; }
+.dup-foot .btn, .cleanup-bar .btn { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
 
 /* Dependencies in the whole environment (feature 023) */
 .dep-block { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
@@ -563,7 +564,9 @@
 /* the two areas: tabs, so they never look like the filters below them */
 .area-switch { display: flex; gap: var(--sp-1); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--color-border); }
 .area-tab { display: inline-flex; align-items: center; gap: var(--sp-2); margin-bottom: -1px; padding: var(--sp-2) var(--sp-4); border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-text-muted); font: inherit; font-weight: 600; cursor: pointer; }
-.area-tab:hover { color: var(--color-text-strong); }
+.area-tab:hover:not(:disabled) { color: var(--color-text-strong); }
+/* while the tool is reading every button waits (T8): a tab that ignores a click must look and say so */
+.area-tab:disabled { opacity: 0.45; cursor: progress; }
 .area-tab.is-active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
 .area-tab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 
@@ -819,3 +822,17 @@
 /* The toggle keeps its shape in any row: it never shrinks (a squeezed track pushed the knob over its edge), the knob stays a circle */
 .toggle { flex: none; box-sizing: border-box; min-width: 66px; }
 .toggle::after { flex: none; box-sizing: border-box; min-width: 18px; min-height: 18px; aspect-ratio: 1 / 1; }
+
+/* Animated logo loader (feature 025): the wait of the whole pane. Tokens only; one period variable drives every movement. */
+.logo-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-3); min-height: max(240px, calc(100vh - 300px)); padding: var(--sp-4); text-align: center; color: var(--color-primary); }
+.logo-loader--new { opacity: 0; animation: logo-loader-in 0.35s ease var(--loader-appear) forwards; }
+.logo-loader-mark { position: relative; display: grid; place-items: center; width: min(72px, 30vw); aspect-ratio: 1; }
+.logo-loader-halo { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 30%, transparent), transparent 68%); animation: logo-loader-halo var(--loader-period) ease-in-out infinite; animation-delay: var(--loader-phase); }
+.logo-loader-svg { position: relative; width: 78%; height: 78%; overflow: visible; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.logo-loader-flow { stroke-dasharray: 2 2.5; animation: logo-loader-flow var(--loader-period) linear infinite; animation-delay: var(--loader-phase); }
+.logo-loader-node { transform-box: fill-box; transform-origin: center; animation: logo-loader-pulse var(--loader-period) ease-in-out infinite; animation-delay: calc(var(--loader-phase) + var(--loader-period) * var(--n) / 3); }
+.logo-loader-text { margin: 0; max-width: 52ch; font-size: var(--fs-sm); color: var(--color-text-muted); overflow-wrap: anywhere; }
+@keyframes logo-loader-flow { to { stroke-dashoffset: -9; } }
+@keyframes logo-loader-pulse { 0%, 100% { transform: scale(1); fill: transparent; } 35% { transform: scale(1.35); fill: color-mix(in srgb, var(--color-primary) 40%, transparent); } }
+@keyframes logo-loader-halo { 0%, 100% { transform: scale(0.82); opacity: 0.5; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes logo-loader-in { from { opacity: 0; } to { opacity: 1; } }

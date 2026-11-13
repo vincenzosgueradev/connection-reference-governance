@@ -145,14 +145,53 @@ describe('the list', () => {
         expect(names(a)).toEqual(['dead@example.test', 'three@example.test', 'two@example.test']);
         expect(rows(a).find(r => q(r, '.conn-name')!.textContent === 'two@example.test')!.classList.contains('is-open')).toBe(true);
     });
+    it('from inside a solution the area tabs are there: Connections opens in one click and Solutions comes back to the same solution', async () => {
+        const a = await app({ answer, connectionRows: SEEDS.map(x => ({ ...x })) });
+        await settle();
+        const heading = () => q(a.root, '.panel-heading')?.textContent ?? '';
+        const solution = heading();
+        expect(solution).not.toBe('');
+        const tab = (label: string) => (qa(a.root, '.area-tab') as HTMLButtonElement[]).find(t => t.textContent === label)!;
+        expect(tab('Solutions').classList.contains('is-active')).toBe(true);
+        tab('Connections').click();
+        await a.controller.idle();
+        await settle();
+        expect(rows(a).length).toBeGreaterThan(0);
+        tab('Solutions').click();
+        await settle();
+        expect(heading()).toBe(solution);
+        expect(rows(a).length).toBe(0);
+    });
+    it('while the tool is reading the area tabs look and say that they wait (a tab that ignores a click must not look clickable)', async () => {
+        let release!: () => void;
+        const gate = new Promise<void>(r => { release = r; });
+        const a = await app({ answer, connectionRows: SEEDS, beforeConnections: () => gate });
+        const run = a.controller.connections!.open();
+        await settle();
+        const tabs = qa(a.root, '.area-tab') as HTMLButtonElement[];
+        expect(tabs.length).toBe(2);
+        for (const t of tabs) {
+            expect(t.disabled).toBe(true);
+            expect(t.title).toMatch(/still reading/i);
+        }
+        release();
+        await run;
+        await a.controller.idle();
+        await settle();
+        for (const t of qa(a.root, '.area-tab') as HTMLButtonElement[]) {
+            expect(t.disabled).toBe(false);
+            expect(t.title).toBe('');
+        }
+    });
     it('while the list is read every button is disabled by the one rule, and the wait says how many are in', async () => {
         let release!: () => void;
         const gate = new Promise<void>(r => { release = r; });
         const a = await app({ answer, connectionRows: SEEDS, beforeConnections: () => gate });
         const run = a.controller.connections!.open();
         await settle();
-        expect(q(a.root, '.dep-loading .spinner')).not.toBeNull();
-        expect(q(a.root, '.cm-wait')!.textContent).toContain('Reading the connections');
+        expect(q(a.root, '.logo-loader')).not.toBeNull(); // feature 025: the wait of the whole pane is the animated logo
+        expect(q(a.root, '.logo-loader')!.getAttribute('role')).toBe('status');
+        expect(q(a.root, '.logo-loader')!.textContent).toContain('Reading the connections');
         for (const b of qa(a.root, 'button') as HTMLButtonElement[]) expect(b.disabled, b.textContent ?? '').toBe(true);
         release();
         await run;

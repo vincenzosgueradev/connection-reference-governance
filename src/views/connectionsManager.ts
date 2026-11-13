@@ -15,6 +15,8 @@ import { connectionDeletion } from './connectionDeletion';
 import type { ConnectionsHandlers } from './connectionsHandlers';
 import { connectorTile } from './connections';
 import { readingLine } from './dependencies';
+import { logoLoader } from './loader';
+import { actionRunning } from '../state/running';
 
 /**
  * The Connections area (feature 024, constitution T11): every connection of the environment that the signed-in user can
@@ -32,11 +34,13 @@ export function areaSwitch(s: State, onPick: (area: 'solutions' | 'connections')
     const box = el('div', 'area-switch');
     box.setAttribute('role', 'group');
     box.setAttribute('aria-label', 'Area');
+    const running = actionRunning(s);
     for (const [key, label, glyph] of [['solutions', 'Solutions', 'stack'], ['connections', 'Connections', 'plug']] as const) {
         const tab = el('button', s.area === key ? 'area-tab is-active' : 'area-tab');
         tab.type = 'button';
         if (s.area === key) tab.setAttribute('aria-current', 'page');
         tab.append(icon(glyph, 'icon--sm'), label);
+        if (running) tab.title = 'The tool is still reading: this tab is available when it ends.';
         tab.addEventListener('click', () => onPick(key));
         box.append(tab);
     }
@@ -355,9 +359,8 @@ export function connectionsManager(s: State, store: Store, h: ConnectionsHandler
         return root;
     };
     if ((c.list.status === 'idle' || c.list.status === 'loading') && rows.length === 0) {
-        const wait = el('div', 'cm-wait');
-        wait.append(readingLine(c.list.read > 0 ? `Reading the connections... ${c.list.read} read so far` : 'Reading the connections of the environment...'));
-        return early(wait);
+        // the wait of the whole pane: the animated logo with the real count so far (feature 025)
+        return early(logoLoader(c.list.read > 0 ? `Reading the connections... ${c.list.read} read so far` : 'Reading the connections of the environment...'));
     }
     if (c.list.status === 'failed' && rows.length === 0) {
         const failed = el('div', 'cm-failed');

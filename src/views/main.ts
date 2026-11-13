@@ -20,6 +20,7 @@ import { removalModal } from './removal';
 import { flowDetail, referenceDetail, stateChip, typeChip } from './detail';
 import type { ConnectionsHandlers } from './connectionsHandlers';
 import { areaSwitch, connectionsManager } from './connectionsManager';
+import { loaderIdle, logoLoader } from './loader';
 
 /** DOM only, built with the shared UI kit. Decisions are in model/ and services/; user intent goes out through `Handlers`. */
 export interface Handlers {
@@ -110,10 +111,12 @@ function solutionList(s: State, store: Store, h: Handlers): HTMLElement {
         s.solutionSort,
     );
     if (shown.length === 0) {
+        if (s.busy && s.solutions.length === 0) {
+            root.append(logoLoader('Reading the solutions...')); // the wait of the whole pane (feature 025)
+            return root;
+        }
         root.append(emptyState(
-            s.busy && s.solutions.length === 0 ? 'Loading solutions...'
-                : unmanaged.length === 0 ? 'There are no unmanaged solutions in the connected environment.'
-                    : `No solution matches "${s.solutionFilter}".`,
+            unmanaged.length === 0 ? 'There are no unmanaged solutions in the connected environment.' : `No solution matches "${s.solutionFilter}".`,
             unmanaged.length === 0 ? 'stack' : 'search',
         ));
         return root;
@@ -352,6 +355,12 @@ function solutionDetail(s: State, store: Store, h: Handlers, environment: string
     } else if (!s.cleanup && s.studio) p.root.append(studioDialog(s, store, h, environment));
     else resetStudioMotion();
     p.root.classList.add('screen');
+    // inside a solution the other area is one click away (the tabs of the home screen); never during a write path
+    if (h.connections) {
+        const wrap = el('div', 'screen');
+        wrap.append(areaSwitch(s, area => pickArea(store, h, area)), p.root);
+        return wrap;
+    }
     return p.root;
 }
 
@@ -404,7 +413,7 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
             return;
         }
         if (!s.snapshot) {
-            root.append(emptyState(s.busy ? 'Reading the solution...' : 'The solution could not be read.'));
+            root.append(s.busy ? logoLoader('Reading the solution...') : emptyState('The solution could not be read.'));
             return;
         }
         root.append(solutionDetail(s, store, h, environment()));
@@ -442,6 +451,7 @@ export function mountMain(root: HTMLElement, store: Store, h: Handlers, environm
         const start = label !== null && typeof active!.selectionStart === 'number' ? active!.selectionStart : null;
         const end = label !== null && typeof active!.selectionEnd === 'number' ? active!.selectionEnd : null;
         draw();
+        if (!root.querySelector('.logo-loader')) loaderIdle(); // the next wait is a new wait (feature 025)
         // the global rule: while an action runs every button is disabled, here, once, whatever drew it (constitution T8)
         const running = actionRunning(store.get());
         root.classList.toggle('is-running', running);

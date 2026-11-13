@@ -209,6 +209,11 @@ Every flag states the data it is based on. No flag is a guess.
   never only a dimmed label; an operation with steps shows the steps with their real state (pending, active, done), driven
   by what the code reached and not by a timer; the end is shown (a done state) before the view moves on; with reduced
   motion the movement is static or slow.
+- A wait that fills the whole pane (nothing else to show yet: the first read of the solutions, of a solution, of the
+  connections) shows the tool's own logo, animated, with a caption of what is being read (added 1.9.1, feature 025). It
+  is drawn from theme tokens, announced as a polite status, never driven by a timer for its words, not drawn for a
+  wait too short to notice, and slowed (never removed) with reduced motion. Waits inside buttons, dialogs and lists that
+  already have content keep the small spinner.
 
 ### T9. Tests specific to this tool
 - The `clientdata` rewrite has a round-trip oracle: after the change, parsing the new JSON gives the old JSON with
@@ -224,4 +229,4 @@ README, the specs, the research notes, the tests or the commit messages. A Credi
 or images are actually copied and a licence asks for it, and then only with the owner's written consent to be named.
 This tool copies nothing, so its README has no Credits section.
 
-**Version**: 1.9.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-11
+**Version**: 1.9.2 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-13

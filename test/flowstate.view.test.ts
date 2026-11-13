@@ -224,3 +224,17 @@ describe('when nothing can be written (hand test: "no row can be written")', () 
         expect(q(a.root, '.nothing-written')).toBeNull();
     });
 });
+
+describe('the area tabs and a write path', () => {
+    it('offers the area tabs on the solution screen and not during the write path, so a write is never left by a tab', async () => {
+        const a = await inStudio();
+        a.store.dispatch({ type: 'closeStudio' } as never);
+        await settle();
+        expect(qa(a.root, '.area-tab').length).toBe(2);
+        const b = await inStudio();
+        buttonByText(b.root, 'Review changes')!.click();
+        await settle();
+        expect(q(b.root, '.preview, .step-body')).not.toBeNull(); // the preview step is open
+        expect(qa(b.root, '.area-tab').length).toBe(0);
+    });
+});
