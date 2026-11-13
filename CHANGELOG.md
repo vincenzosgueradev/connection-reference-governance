@@ -2,11 +2,14 @@
 
 All notable changes are listed here, newest first. Format: Keep a Changelog; versions follow SemVer.
 
-## [Unreleased]
+## [0.1.0] - 2026-11-13
 
 ### Added
 
-- Connections: deleting connections is on. It was checked live on 28 connections of a test environment (each checked again, deleted and read back); the dialog is wider and cannot be closed while it runs.
+- Inside a solution the Solutions and Connections tabs are shown above it, so the Connections area is one click away and Solutions brings you back to the same solution; during a change (preview, apply, result) they are hidden so a write is never left by a tab.
+- While the tool is reading, the Solutions and Connections tabs are dimmed and say that they wait, instead of looking clickable and ignoring the click.
+- Every wait of the whole pane (reading the solutions, a solution or the connections) shows the tool's own logo, animated: the dashed lines run towards the right node while the nodes pulse, with a caption of what is being read. It follows the theme, slows down (never stops) with reduced motion, is announced as a status and is not drawn for a wait too short to notice. The small spinner stays in buttons, dialogs and lists.
+- Deleting connections: Preview, a backup with no email and no secret, a one-time code and an acknowledgement, each connection checked again just before and read back after. It was checked live on 28 connections of a test environment (each checked again, deleted and read back); the dialog is wider and cannot be closed while it runs.
 - Connections: the connector filter shows the drawing of every connector next to its name and its count, instead of a plain list.
 - Connections: the Power Platform inventory names the flows that use a connector; each is read in Dataverse and told apart (uses this connection, uses another, or cannot be tied to one). A flow that cannot be tied to a connection is listed by name and the connection is then Could not be checked instead of No dependency found. When the inventory is refused nothing changes.
 - Connections: before a deletion each connection is confirmed in the Maker portal, one by one (the tool cannot see flows that live only in the flow service); Delete unlocks only when all are confirmed. Connections that belong to a flow are no longer listed.
@@ -16,15 +19,9 @@ All notable changes are listed here, newest first. Format: Keep a Changelog; ver
 - Flows that dependency tracking leaves out are found by searching their definitions for the name of each reference that holds the connection (compared with the portal on an Office 365 connection: 14 flows in common, each side with some the other lacks).
 - The coverage note says how much each source read ("11 apps, 57 connection references (0 hold it)"), each problem is said once, a permission refusal is said in words, and the detail of a connection with No dependency found says next to it that the portal can show flows this tool cannot see. The Power Automate API was tried and the toolbox is not allowed to call it.
 - Check all reads every connection four at a time with a progress bar and a Cancel (what was read is kept), and Select the ones with no dependency found ticks the connections that can be deleted.
-- Deleting connections: Preview, a backup with no email and no secret, a one-time code and an acknowledgement, each connection checked again just before and read back after. It is switched off (the declared flag `connectionDelete`) until the route is verified on a test connection; while it is off each connection offers Copy portal address.
 - Connections: simpler layout. The two areas are tabs; one toolbar row and one row of actions; short rows with a short code of the id and the whole id in the tooltip and the details (nothing is truncated); the sort is the header of the column; the list is the only region that scrolls.
 - A connection held only by connection references (no flow, app or agent found using them) says Held by N reference(s) instead of In use; it is still a dependency and cannot be selected for deletion.
 - The connection chip of a reference in the solution views opens that connection in the Connections area.
-
-## [0.1.0] - 2026-11-04
-
-### Added
-
 - Clean up: the tag "Duplicate of ..." in the Unused tab names the reference you chose to keep, not only the suggested one.
 - Clean up: with one group of duplicates its merge button (Merge into... or Review as unused...) sits in the fixed bar of the dialog, next to Close, instead of at the end of the scrolling list.
 - Opening a reference row (or clicking Used by) reads what uses the reference in the whole environment by itself, with nothing to press; Check again stays for a retry.

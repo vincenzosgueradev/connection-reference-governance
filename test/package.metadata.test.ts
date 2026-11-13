@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 // Marketplace rules from PPTB-PUBLISHING-RULES.md sections 2-4. Add a case here whenever a review teaches something.
@@ -69,5 +69,18 @@ describe('README', () => {
     it('has the sections the marketplace requires', () => {
         for (const h of ['What this tool changes', 'Privacy and network use', 'Support and bugs', 'AI Assistance'])
             expect(readme).toContain(`## ${h}`);
+    });
+});
+
+describe('README sells the tool: screenshots', () => {
+    const shots = existsSync(new URL('../docs/screenshots', import.meta.url))
+        ? readdirSync(new URL('../docs/screenshots', import.meta.url)).filter(f => /\.(png|gif|jpe?g)$/i.test(f))
+        : [];
+    // skipped while the README still has the template's comments (they are removed before release)
+    it.skipIf(readme.includes('<!--'))('shows at least one real screenshot', () => {
+        expect(readme).toMatch(/!\[[^\]]*\]\(https:\/\/raw\.githubusercontent\.com\/[^)]+\.(png|gif|jpe?g)\)/i);
+    });
+    it('uses every file of docs/screenshots by its full raw URL, so no capability stays hidden', () => {
+        for (const f of shots) expect(readme, f).toContain(`/docs/screenshots/${f})`);
     });
 });
