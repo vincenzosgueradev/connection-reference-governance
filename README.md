@@ -1,6 +1,13 @@
 # Connection Reference Governance
 
-See which connection references every flow in a solution uses, find references with no connection or flows pointing at a missing reference, and change or re-point them in bulk after a preview. Works on unmanaged solutions in the connected environment.
+A solution-first workbench for connection references in one environment. Open a solution, see which references and connections each flow really uses, re-point flows to the reference you choose with the exact change shown as a line diff, and find out what depends on a reference or a connection anywhere in the environment before you remove or delete it. Works on unmanaged solutions in the connected environment.
+
+## What sets it apart
+
+- **It starts from the flow.** One row per flow with the reference, connector and connection behind every action, and the same data grouped by reference. You choose which flow points where, not only which duplicates merge.
+- **It shows the change before it is written.** The preview is the exact definition that will be stored, as a line diff, with what each row is now and will be, and a per-row result and read-back afterwards.
+- **It looks beyond the solution.** Dependencies are read for the whole environment (flows, Copilot Studio agents, apps, other components, in any solution) and the Connections area covers the connections themselves, with what depends on each one.
+- **It says what it could not see.** A connection nothing was found for says "No dependency found", never "unused", and each source reports how much it read.
 
 ## Features
 
@@ -22,6 +29,19 @@ See which connection references every flow in a solution uses, find references w
 - Each row is checked again just before it is written (skipped if someone changed it meanwhile) and read back afterwards.
 - Flows that are turned on cannot be changed in Dataverse. With your permission (off by default, a block in the studio with a warning, the list of flows and a second acknowledgement) the tool turns them off for the change and on again afterwards, even when the write fails; a flow left off is named in the result and in the report.
 - Managed solutions cannot be changed, so they are not offered: a disabled Managed tab shows how many there are.
+
+## Overlap with EnvVar & ConnRef Matrix
+
+The listed tool **EnvVar & ConnRef Matrix** also works with connection references: it binds them to connections, consolidates duplicate references by re-pointing flows, deletes unused references after a dependency check and flags flows that point at a missing reference. Its centre is the **comparison of environments** and the deployment of values between them (a matrix of environment variables and references across environments, copying values, `deploymentSettings.json`). This tool stays in **one environment** and starts from the solution and its flows. What it adds:
+
+- The **per-solution flow-to-reference view**: one row per flow with every reference, connector and connection it uses, and the same data grouped by reference.
+- **Re-point any flow** to another reference of the same connector, chosen flow by flow, with a line diff of the flow definition before anything is written (not only the merge of duplicates).
+- **Create a connection reference** in the open solution, with checked names and an optional connection.
+- **Remove references from a solution** while they stay in the environment (as well as delete them).
+- **Dependencies in the whole environment** for a reference or a connection, in any solution: flows, Copilot Studio agents, apps and other components, with what lies outside the solution.
+- The **Connections** area: the connections of the environment with status, what depends on each one, and a guarded delete.
+
+If you compare environments or bind references from a settings file, use that tool; the two do not need each other.
 
 ## Screenshots
 
@@ -158,9 +178,14 @@ AI helped write a substantial part of the code and tests. The author reviews and
 
 ## Updates
 
-Page text reviewed for version 0.1.0.
+Page text reviewed for version 0.1.1.
 
 Full history: https://github.com/vincenzosgueradev/connection-reference-governance/blob/main/CHANGELOG.md
+
+### 0.1.1 - 2026-11-14
+
+- The tool now follows the Power Platform ToolBox theme (light or dark) instead of the operating system theme, and changes with it while open.
+- Added a section that explains how this tool relates to EnvVar & ConnRef Matrix and what it adds, and a short summary of what sets this tool apart.
 
 ### 0.1.0 - 2026-11-13
 

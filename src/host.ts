@@ -3,6 +3,7 @@
  * Only the connected Dataverse environment is reachable (constitution T1).
  */
 
+import type { ThemeApi } from './theme';
 import { features } from './features';
 import { environmentIdFrom } from './model/liveConnections';
 
@@ -206,4 +207,9 @@ export function createHost(): Host {
             await window.toolboxAPI.utils.showNotification({ title: 'Connection Reference Governance', body: message, type: kind, duration: 6000 }); // closes by itself: the host's close button was seen not to respond
         },
     };
+}
+
+/** The theme part of the PPTB API, for `initTheme` (this file is the only door to PPTB). Undefined outside PPTB. */
+export function themeApi(): ThemeApi | undefined {
+    return (window as { toolboxAPI?: ThemeApi }).toolboxAPI;
 }

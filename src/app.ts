@@ -1,5 +1,5 @@
 import { createController } from './controller';
-import { createHost } from './host';
+import { createHost, themeApi } from './host';
 import { log } from './services/log';
 import { mountLogDock } from './views/logDock';
 import { initialState } from './state/reducer';
@@ -7,9 +7,11 @@ import { createStore } from './state/store';
 import { installErrorBoundary } from './views/errorBoundary';
 import { connectionBadge, setConnectionBadge } from './ui/components';
 import { mountMain } from './views/main';
+import { initTheme } from './theme';
 
 // Entry: composes host, store and views. No rules and no markup of its own.
 function init(): void {
+    void initTheme(themeApi()); // PPTB theme first, so the first paint is not the OS one
     const host = createHost();
     const version = document.getElementById('app-version');
     if (version) version.textContent = `v${__APP_VERSION__}`;

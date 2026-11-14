@@ -1,8 +1,8 @@
 {
     "name": "@vincenzosgueradev/pptb-connection-reference-governance",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "displayName": "Connection Reference Governance",
-    "description": "See which connection references every flow in a solution uses, find references with no connection or flows pointing at a missing reference, and change or re-point them in bulk after a preview. Works on unmanaged solutions in the connected environment.",
+    "description": "A solution-first workbench for connection references in one environment: see which references and connections each flow uses, re-point flows with a line-diff preview, and check what depends on a reference or a connection in the whole environment before you remove or delete it.",
     "type": "module",
     "main": "index.html",
     "icon": "logo.svg",
@@ -43,7 +43,11 @@
     ],
     "keywords": [
         "pptb",
-        "power-platform"
+        "power-platform",
+        "connection-references",
+        "cloud-flows",
+        "dataverse",
+        "solutions"
     ],
     "configurations": {
         "repository": "https://github.com/vincenzosgueradev/connection-reference-governance",

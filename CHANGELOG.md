@@ -2,6 +2,16 @@
 
 All notable changes are listed here, newest first. Format: Keep a Changelog; versions follow SemVer.
 
+## [0.1.1] - 2026-11-14
+
+### Fixed
+
+- The theme follows Power Platform ToolBox, not only the operating system: it is read with `toolboxAPI.utils.getCurrentTheme()` on load and updated on the `settings:updated` event (`data-theme` on `<html>`); `prefers-color-scheme` stays as the fallback outside ToolBox.
+
+### Changed
+
+- README: a section on the overlap with EnvVar & ConnRef Matrix (what it does, what this tool adds) and a summary of what sets this tool apart; the package description says the same.
+
 ## [0.1.0] - 2026-11-13
 
 ### Added
